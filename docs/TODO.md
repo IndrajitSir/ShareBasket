@@ -5,18 +5,24 @@
 Give every task a stable ID and track its description, status, relevant tests/verification, commit hash after commit, and remaining work/blockers. Use `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `VERIFICATION_FAILED`, `VERIFIED`, `COMMITTED`, or `DONE`. `DONE` requires implementation, required verification, review, and a confirmed commit. For multi-unit features, record each unit/commit and keep the feature open until all required units are done.
 
 ## Current focus
-Phase 0 — bootstrap repository and implement the first independently verifiable community-campaign discovery slice.
+Incrementally turn the read-only storefront prototype into an end-to-end marketplace. The next independently verifiable slice is a read-only campaign preview API; it remains unauthenticated sample data and must not accept live buyer or supplier records.
 
 ## In progress
 - [ ] P0-01 | DONE | Inspect workspace, runtime, tooling and Git state. | Verify: workspace listing and runtime versions inspected. | Commit: — | Remaining/blockers: no application or package scripts existed in the initial checkout.
 - [ ] P0-02 | DONE | Read the project documentation and resolve duplicate policy wording. | Verify: canonical docs reviewed; duplicate section removed. | Commit: — | Remaining/blockers: continue product setup.
-- [ ] P0-03 | IN_PROGRESS | Bootstrap the first marketplace vertical slice and its local verification. | Verify: focused checks to be recorded. | Commit: — | Remaining/blockers: no source/build framework was present.
-- [ ] P0-04 | NOT_STARTED | Select ORM, auth/session approach and contract strategy based on repo evidence. | Verify: decisions and rationale documented. | Commit: — | Remaining/blockers: implement only after evidence.
+- [ ] P0-03 | VERIFIED | Bootstrap the sample community campaign prototype: discovery and detail screens, integer-paise tier pricing, and a read-only `GET /api/campaigns` preview API. | Verify: 8 focused tests, `tsc --noEmit`, and production build passed; final diff reviewed; only unit files staged. | Commit: recorded after commit | Remaining/blockers: sample-only data; no accounts, persistence, commitments or payments.
+- [ ] P0-04 | NOT_STARTED | Select ORM, auth/session approach and contract strategy based on repo evidence. | Verify: decisions and rationale documented. | Commit: — | Remaining/blockers: live product architecture pending.
 - [ ] P0-05 | NOT_STARTED | Establish application structure and typecheck/lint/test/build scripts. | Verify: run available checks from project scripts. | Commit: — | Remaining/blockers: bootstrap stack.
 - [ ] P0-06 | NOT_STARTED | Set up PostgreSQL, migrations, synthetic seeds and environment validation. | Verify: fresh setup and migration/schema checks. | Commit: — | Remaining/blockers: confirm app stack and ORM.
 - [ ] P0-07 | NOT_STARTED | Add `.env.example` placeholders and CI quality gates. | Verify: inspect configuration; CI runs intended checks. | Commit: — | Remaining/blockers: never include real secrets.
 
 ## Backlog
+- [ ] P0-08 | NOT_STARTED | Implement the persistent campaign, product, price-tier and community data model with migrations. | Verify: fresh/upgraded migration and constraint tests. | Commit: — | Remaining/blockers: ORM and database bootstrap.
+- [ ] P0-09 | NOT_STARTED | Replace the sample catalogue source with a persistent, validated, read-only campaign repository/API without exposing write operations. | Verify: repository/API tests, malformed query/unknown campaign cases, and migration checks. | Commit: — | Remaining/blockers: choose runtime-compatible database/migration approach; API must not return unverified supplier or buyer data.
+- [ ] P1-01 | NOT_STARTED | Implement account/profile and society membership with scoped access. | Verify: authentication and cross-society negative tests. | Commit: — | Remaining/blockers: auth provider/product requirements.
+- [ ] P3-01 | NOT_STARTED | Replace sample campaigns and demand counts with authorized API data and server-calculated quotes. | Verify: permission, price-boundary and integration tests. | Commit: — | Remaining/blockers: persisted domain model, API contract and verified suppliers.
+- [ ] P3-02 | NOT_STARTED | Add a validated, idempotent commitment workflow with transactional stock/threshold updates. | Verify: transaction, retry, race and closed-campaign tests. | Commit: — | Remaining/blockers: data model, auth and human-approved business rules.
+
 - [ ] B-01 | NOT_STARTED | Scope-aware RBAC and negative tests. | Verify: role/scope boundary tests. | Commit: — | Remaining/blockers: identity foundation.
 - [ ] B-02 | NOT_STARTED | Society membership workflow. | Verify: membership API/UI and authorization tests. | Commit: — | Remaining/blockers: identity/RBAC.
 - [ ] B-03 | NOT_STARTED | Supplier onboarding/approval. | Verify: onboarding and supplier-scope tests. | Commit: — | Remaining/blockers: identity/RBAC.

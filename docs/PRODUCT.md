@@ -39,3 +39,6 @@ Verified societies with active campaigns; campaign conversion/completion; repeat
 
 ## Acceptance criteria
 Backend calculates all prices/totals; order lines preserve historical price/tax/fee snapshots; duplicate requests/webhooks cannot duplicate effects; progress and stock cannot be client-manipulated; buyers cannot access other buyers' private data; suppliers and society admins are scope-isolated; privileged actions are audited; critical flows have automated tests.
+
+## Current prototype scope
+A read-only storefront adaptation is the initial prototype slice. It shows clearly labeled sample group-buy campaigns, sample community progress, integer-paise tier pricing, category/community filters and campaign detail pages. It does not create accounts, take commitments, reserve stock, accept payment, or represent live supplier offers. See `KNOWLEDGEBASE.md` for this reversible implementation choice and `TODO.md` for the follow-on backend, data and authorization work.
