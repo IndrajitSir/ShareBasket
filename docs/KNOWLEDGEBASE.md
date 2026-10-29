@@ -20,5 +20,15 @@ Initial market India/INR; pilot starts with a small number of societies in one c
 9. Retention/deletion rules?
 10. Pilot city, delivery radius and initial categories?
 
+## Decision log
+
+### 2026-10-30 — Runtime stack for the prototype
+- **Context:** The docs specify Next.js App Router + NestJS + PostgreSQL, but the working repository is a Vite + React SPA served by a Hono Worker on Cloudflare Workers (with a Sites deploy manifest), and the sandbox has no PostgreSQL server.
+- **Options:** (a) rebuild as Next.js + NestJS + PostgreSQL now, (b) build buyer-facing slices on the existing Worker stack and document the deviation, (c) stop and ask before writing product code.
+- **Chosen:** (b). Build small, verified vertical slices on the existing stack; keep domain logic (paise pricing, progress, quotes) in plain TypeScript modules so it can move to a NestJS service later without rewriting rules.
+- **Trade-offs:** No SQL persistence, migrations, sessions or RBAC yet; the Worker has no Node runtime, so anything depending on `pg`/TypeORM cannot run here. Data is in-memory sample data.
+- **Docs/tests updated:** `PRODUCT.md` (prototype scope), `API_CONTRACTS.md` (implemented preview endpoints), `ROADMAP.md`, `TODO.md` (P0-03, P0-03a, P0-09), `tests/campaigns.test.mjs`.
+- **Revisit trigger:** Before real supplier/buyer data or any persistence requirement — decide between D1 on Workers and a separately hosted NestJS/PostgreSQL API. This is a product-owner decision, so it is recorded rather than assumed.
+
 ## Decision log template
 Date; decision; context; options; chosen option/rationale; trade-offs; docs/code/tests updated; revisit trigger. Convert assumptions to decisions explicitly; never present an assumption as fact.
