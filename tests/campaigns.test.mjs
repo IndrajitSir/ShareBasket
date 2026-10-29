@@ -29,7 +29,8 @@ registerHooks({
   },
 })
 
-const { campaigns, formatRupees, getCampaignProgress, getCampaignProduct, getUnitPricePaise } = await import('../src/data/campaigns.ts')
+const { CampaignClosedError, MAX_UNITS_PER_QUOTE, QuoteValidationError, campaigns, formatRupees, getCampaignProgress, getCampaignProduct, getUnitPricePaise, quoteCampaign } =
+  await import('../src/data/campaigns.ts')
 const { default: campaignApi } = await import('../src/worker/index.ts')
 const jsonResponse = async (path) => {
   const request = new Request(`https://preview.example${path}`)
@@ -98,6 +99,68 @@ test('campaign API returns detail and a stable not-found response', async () => 
   const missing = await jsonResponse('/api/campaigns/does-not-exist')
   assert.equal(missing.status, 404)
   assert.deepEqual(await missing.json(), { error: 'Campaign not found.' })
+})
+
+test('a quote prices the whole line at the tier its units would reach', () => {
+  assert.ok(rice)
+  const quote = quoteCampaign(rice, 16, new Date('2026-10-30T00:00:00+05:30'))
+  assert.equal(quote.unitsAfterCommitment, 50)
+  assert.equal(quote.unitPricePaise, 26900)
+  assert.equal(quote.lineTotalPaise, 430400)
+  assert.equal(quote.currentUnitPricePaise, 28900)
+  assert.equal(quote.unitSavingPaise, 2000)
+  assert.equal(quote.unitsToNextTier, 50)
+  assert.equal(quote.nextTier.minimumUnits, 100)
+})
+
+test('a quote rejects invalid quantities and closed campaigns', () => {
+  assert.ok(rice)
+  const now = new Date('2026-10-30T00:00:00+05:30')
+  assert.throws(() => quoteCampaign(rice, 0, now), QuoteValidationError)
+  assert.throws(() => quoteCampaign(rice, 2.5, now), QuoteValidationError)
+  assert.throws(() => quoteCampaign(rice, MAX_UNITS_PER_QUOTE + 1, now), QuoteValidationError)
+  assert.equal(quoteCampaign(rice, MAX_UNITS_PER_QUOTE, now).quantity, MAX_UNITS_PER_QUOTE)
+  assert.throws(() => quoteCampaign({ ...rice, closesAt: '2026-10-01T00:00:00+05:30' }, 5, now), CampaignClosedError)
+})
+
+test('quote API returns a server-calculated line total and rejects bad requests', async () => {
+  const quote = await campaignApi.request(
+    new Request('https://preview.example/api/campaigns/everyday-rice/quote', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ quantity: 16 }),
+    }),
+    {},
+    { ASSETS: { fetch: async () => new Response('asset') } },
+  )
+  assert.equal(quote.status, 200)
+  const body = await quote.json()
+  assert.equal(body.previewOnly, true)
+  assert.equal(body.quote.unitPrice, '₹269.00')
+  assert.equal(body.quote.lineTotal, '₹4,304.00')
+
+  const invalid = await campaignApi.request(
+    new Request('https://preview.example/api/campaigns/everyday-rice/quote', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ quantity: 0 }),
+    }),
+    {},
+    { ASSETS: { fetch: async () => new Response('asset') } },
+  )
+  assert.equal(invalid.status, 400)
+  assert.deepEqual(await invalid.json(), { error: 'Quantity must be a whole number of at least 1.' })
+
+  const missing = await campaignApi.request(
+    new Request('https://preview.example/api/campaigns/nope/quote', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ quantity: 1 }),
+    }),
+    {},
+    { ASSETS: { fetch: async () => new Response('asset') } },
+  )
+  assert.equal(missing.status, 404)
 })
 
 test('campaign preview endpoints do not accept commitment writes', async () => {

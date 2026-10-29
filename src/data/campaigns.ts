@@ -132,6 +132,67 @@ export function getUnitPricePaise(campaign: Campaign, totalUnits: number): numbe
   return tier.unitPricePaise
 }
 
+export const MAX_UNITS_PER_QUOTE = 20
+
+export class CampaignClosedError extends Error {
+  constructor() {
+    super('This campaign has closed.')
+    this.name = 'CampaignClosedError'
+  }
+}
+
+export class QuoteValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'QuoteValidationError'
+  }
+}
+
+export interface CampaignQuote {
+  quantity: number
+  unitPricePaise: number
+  lineTotalPaise: number
+  currentUnitPricePaise: number
+  unitSavingPaise: number
+  unitsAfterCommitment: number
+  nextTier: PriceTier | null
+  unitsToNextTier: number | null
+}
+
+/**
+ * Server-side quote. The same unit price applies to the whole line, and the
+ * household's requested units count toward the campaign tier threshold.
+ */
+export function quoteCampaign(campaign: Campaign, quantity: number, now: Date = new Date()): CampaignQuote {
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new QuoteValidationError('Quantity must be a whole number of at least 1.')
+  }
+  if (quantity > MAX_UNITS_PER_QUOTE) {
+    throw new QuoteValidationError(`Quantity cannot exceed ${MAX_UNITS_PER_QUOTE} units per household.`)
+  }
+  if (now.getTime() >= new Date(campaign.closesAt).getTime()) {
+    throw new CampaignClosedError()
+  }
+
+  const unitsAfterCommitment = campaign.unitsCommitted + quantity
+  const unitPricePaise = getUnitPricePaise(campaign, unitsAfterCommitment)
+  const currentUnitPricePaise = getUnitPricePaise(campaign, campaign.unitsCommitted)
+  const nextTier = [...campaign.tiers]
+    .sort((left, right) => left.minimumUnits - right.minimumUnits)
+    .find((tier) => tier.minimumUnits > unitsAfterCommitment) ?? null
+
+  return {
+    quantity,
+    unitPricePaise,
+    lineTotalPaise: unitPricePaise * quantity,
+    currentUnitPricePaise,
+    unitSavingPaise: currentUnitPricePaise - unitPricePaise,
+    unitsAfterCommitment,
+    nextTier,
+    unitsToNextTier: nextTier ? nextTier.minimumUnits - unitsAfterCommitment : null,
+  }
+}
+
 export function getCampaignProgress(campaign: Campaign) {
   const nextTier = [...campaign.tiers]
     .sort((left, right) => left.minimumUnits - right.minimumUnits)

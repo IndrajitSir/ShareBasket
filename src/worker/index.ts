@@ -1,6 +1,15 @@
 import { Hono } from 'hono'
 
-import { campaigns, formatRupees, getCampaignProduct, getCampaignProgress, getUnitPricePaise } from '../data/campaigns'
+import {
+  CampaignClosedError,
+  QuoteValidationError,
+  campaigns,
+  formatRupees,
+  getCampaignProduct,
+  getCampaignProgress,
+  getUnitPricePaise,
+  quoteCampaign,
+} from '../data/campaigns'
 
 // The Worker in front of the storefront. The catalogue is static data shipped
 // with the app; this handles the parts a storefront needs a server for.
@@ -57,6 +66,36 @@ app.get('/api/campaigns/:slug', (c) => {
   const preview = campaignPreview(campaign)
   if (!preview) return c.json({ error: 'Campaign product not found.' }, 404)
   return c.json({ campaign: preview, previewOnly: true })
+})
+
+// Server-authoritative sample quote. It prices the requested units at the
+// campaign tier they would reach; it does not reserve stock or create a
+// commitment.
+app.post('/api/campaigns/:slug/quote', async (c) => {
+  const campaign = campaigns.find((item) => item.slug === c.req.param('slug'))
+  if (!campaign) return c.json({ error: 'Campaign not found.' }, 404)
+
+  const body = await c.req.json<{ quantity?: unknown }>().catch(() => null)
+  if (!body || typeof body !== 'object' || typeof body.quantity !== 'number') {
+    return c.json({ error: 'Provide a numeric quantity.' }, 400)
+  }
+
+  try {
+    const quote = quoteCampaign(campaign, body.quantity)
+    return c.json({
+      quote: {
+        ...quote,
+        unitPrice: formatRupees(quote.unitPricePaise),
+        lineTotal: formatRupees(quote.lineTotalPaise),
+        currentUnitPrice: formatRupees(quote.currentUnitPricePaise),
+      },
+      previewOnly: true,
+    })
+  } catch (error) {
+    if (error instanceof QuoteValidationError) return c.json({ error: error.message }, 400)
+    if (error instanceof CampaignClosedError) return c.json({ error: error.message }, 409)
+    throw error
+  }
 })
 
 // Demo checkout: validates the order and returns a reference. Replace the body

@@ -2,6 +2,7 @@ import { ArrowLeft, Clock3, MapPin, PackageCheck, UsersRound } from 'lucide-reac
 import { Link, Navigate, useParams } from 'react-router'
 
 import { campaigns, formatRupees, getCampaignProduct, getCampaignProgress, getUnitPricePaise } from '../../data/campaigns'
+import { CampaignQuote } from '../components/CampaignQuote'
 import { ButtonLink, Container } from '../components/ui'
 
 function closeLabel(closesAt: string): string {
@@ -52,6 +53,7 @@ export function CampaignDetail() {
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="Group order minimum progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><div className="h-full rounded-full bg-[#4d6c51]" style={{ width: `${progress.percent}%` }} /></div>
             <p className="mt-2 text-[13px] text-muted">{progress.minimumMet ? 'The sample minimum has been reached.' : `${progress.unitsRemaining} more units needed to reach the sample minimum.`}</p>
           </div>
+          <CampaignQuote slug={campaign.slug} />
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <span className="inline-flex h-12 items-center justify-center gap-2 rounded-control border border-line-strong px-5 text-[14px] text-muted"><PackageCheck className="size-4" /> Preview only</span>
             <ButtonLink to="/campaigns" variant="secondary" className="h-12">Browse other group buys</ButtonLink>
