@@ -1,0 +1,13 @@
+# Testing Strategy
+Follow the authoritative **Incremental Development, Testing, and Git Commit Policy** in `AGENT_RULES.md`. Verify each meaningful change with the smallest sufficient checks before committing; record the actual checks, results, commit hash and any blockers in `TODO.md`. Do not claim unrun or failing checks passed.
+## Test layers
+Unit: pricing/tiers, permissions, transitions, fees. Integration: repositories, migrations, transaction/outbox, provider adapters. API: DTO validation, auth, scope, error contract and pagination. E2E: register, join society, campaign discovery, checkout, sandbox payment, fulfilment, support/refund. Frontend accessibility/component tests. Load/concurrency tests for order creation, stock and webhooks before launch.
+
+## Required cases
+Buyer A cannot read Buyer B's order/address; society admin cannot manage another society; Supplier A cannot modify Supplier B's records; buyer cannot grant roles; client price edits are ignored; idempotency prevents duplicate order/payment/refund effects; webhook replay is safe; concurrent requests cannot oversell; refunds are capped; closed/expired campaign rejects commitment; notification failure does not roll back order; migrations work on fresh and upgraded DBs.
+
+## Minimum before committing
+For every meaningful unit, inspect the relevant test and project scripts first. Add/update focused tests where behavior changes, then run the relevant test(s) and applicable validation from the checks below (such as typecheck, lint, build, migration/schema validation, or security/authorization boundary checks). Review the final diff for regressions, security issues, secrets, unintended files and generated artifacts; inspect both staged and unstaged diffs and stage only the unit's files. Exact commands depend on the repository and must be confirmed from its tooling. Choose the smallest sufficient checks; broader regression checks belong at integration points. If a relevant check fails, investigate and fix introduced failures before commit; document unrelated/environment failures without misrepresenting the unit as verified.
+
+## Definition of done
+Acceptance criteria met; relevant tests added and pass; lint/typecheck/build pass where applicable or limitation is recorded; authorization and loading/empty/error/forbidden states addressed; docs and TODO updated with verification and commit status; diff reviewed; only intended files committed; no secrets/PII/generated junk committed; session report states changes, exact checks/results, commit, gaps and next tasks. See `AGENT_RULES.md` for statuses, Git safety, commit-message conventions and the full development cycle.

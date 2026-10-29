@@ -1,0 +1,25 @@
+# Data Model
+## Persistence
+Use PostgreSQL for transactional data. for ORM -> Choose TypeORM; use migrations consistently. Redis may later serve cache/queues/rate limits but is not the authority for stock, orders or payments.
+
+## Mandatory master/detail convention
+Master tables hold relatively stable identity, catalogue, reference or configuration data. Detail/transaction tables hold line items, activity, movements, events and history. Examples: `product_master` → `product_variant_master`; `order_master` → `order_detail` + `order_status_history`; `payment_master` → `payment_transaction_detail` + `refund_detail`; `society_master` → `society_membership_detail`; `campaign_master` → `campaign_product_master`, `campaign_price_tier_detail`, `campaign_commitment_detail`; `delivery_master` → `delivery_item_detail` + status history. Use conventional names where clearer; document exceptions. Do not force naming mechanically.
+
+## Proposed entities
+Identity/access: `user_master`, `role_master`, `permission_master`, `user_role_detail` (role + scope type/id), `role_permission_detail`, `refresh_session_detail`, `audit_log_detail`.
+Community: `society_master`, `society_membership_detail`, `society_invite_master` (store token hash), `address_master`.
+Supplier/catalogue: `supplier_master`, `supplier_user_detail`, `category_master`, `product_master`, `product_variant_master`, `product_media_detail`, `inventory_balance_master`, `inventory_movement_detail`.
+Campaigns: `campaign_master`, `campaign_product_master`, `campaign_price_tier_detail`, `campaign_commitment_detail`.
+Transactions: `order_master`, `order_detail`, `order_status_history`, `payment_master`, `payment_transaction_detail`, `refund_detail`, `delivery_master`, `delivery_item_detail`, `delivery_status_history`, `supplier_settlement_master`, `supplier_settlement_detail`.
+Support/platform: `support_ticket_master`, `support_message_detail`, `notification_master`, `notification_delivery_detail`, `consent_detail`, `privacy_request_master`.
+
+## Key fields and rules
+Use UUID PKs unless repository conventions justify otherwise; separate human-readable unique order number. PostgreSQL `timestamptz`, UTC instants. Use decimal/Numeric for money, never float; persist currency. Use quantity precision appropriate to units. Add FKs, unique/check constraints and indexes based on queries. Use explicit lifecycle statuses and transition rules. Snapshot order item name/SKU/unit/quantity/unit price/discount/tax/fees at checkout; do not rewrite historical orders when catalogue changes. Do not delete financial/audit history; use reversal/void records. Minimise PII; never store card data/CVV or plain tokens.
+
+## Transaction safety
+Order creation, stock reservation and campaign commitment must be atomic. Use row locks, optimistic versions or suitable isolation to prevent overselling. Idempotency for orders, payments, refunds and webhook events. Verify payment webhook signatures and deduplicate provider event IDs. Use outbox/durable jobs for reliable side effects. Do not hold DB transactions open during remote API calls.
+
+## Indexes/constraints
+Unique normalised email/phone when supplied; supplier-scoped SKU; campaign status + time + scope; buyer/date and society/status order indexes; unique provider event ID; scoped idempotency key. Positive quantities, nonnegative prices/fees, refund cap, valid campaign window and non-overlapping tiers. Review query plans with realistic data.
+
+Maintain a Mermaid ER diagram once schema stabilises and update schema docs, migrations and tests together.
