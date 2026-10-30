@@ -1,6 +1,11 @@
 # Data Model
 ## Persistence
-Use PostgreSQL for transactional data. for ORM -> Choose TypeORM; use migrations consistently. Redis may later serve cache/queues/rate limits but is not the authority for stock, orders or payments.
+Use PostgreSQL for transactional data. ORM: TypeORM; use migrations consistently. Redis may later serve cache/queues/rate limits but is not the authority for stock, orders or payments.
+
+Development and automated tests may use SQLite (`DB_DRIVER=sqlite`) so the API can run without a database server. Entities, constraints and migrations must remain portable to PostgreSQL; SQLite is never the deployed target. Do not use driver-specific SQL in migrations — build tables through TypeORM's `Table`/`queryRunner` API.
+
+### Implemented schema (read-only slice)
+`category_master` → `product_master`; `society_master` → `campaign_master` → `campaign_product_master` (one product per campaign, extensible to many) and `campaign_price_tier_detail`. Money is stored as integer **paise** (`*_paise`) rather than `numeric`, which is exact and portable across both drivers; repositories must reject fractional or negative amounts. `product_master.details_json` and option values use TypeORM `simple-json` columns for display metadata only, never for queryable business state. UUID primary keys; unique slugs, unique `(campaign_id, minimum_units)` tiers and check constraints on quantities/prices are enforced in the schema.
 
 ## Mandatory master/detail convention
 Master tables hold relatively stable identity, catalogue, reference or configuration data. Detail/transaction tables hold line items, activity, movements, events and history. Examples: `product_master` → `product_variant_master`; `order_master` → `order_detail` + `order_status_history`; `payment_master` → `payment_transaction_detail` + `refund_detail`; `society_master` → `society_membership_detail`; `campaign_master` → `campaign_product_master`, `campaign_price_tier_detail`, `campaign_commitment_detail`; `delivery_master` → `delivery_item_detail` + status history. Use conventional names where clearer; document exceptions. Do not force naming mechanically.

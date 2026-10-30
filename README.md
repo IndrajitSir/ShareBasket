@@ -1,4 +1,4 @@
-# ShareBasket — community group buying (prototype)
+# ShareBasket — community group buying
 
 A community bulk-buying marketplace for residential societies. Neighbours pool
 demand for everyday essentials, see every quantity price tier up front, and
@@ -7,46 +7,79 @@ track progress toward each group minimum.
 The product specification lives in [`docs/`](docs/README.md); start with
 [`docs/PRODUCT.md`](docs/PRODUCT.md) and [`docs/TODO.md`](docs/TODO.md).
 
+## Repository layout
+
+```
+apps/web    Next.js 15 App Router storefront (TypeScript, Tailwind v4)
+apps/api    NestJS REST API at /api/v1 (TypeScript, TypeORM)
+infra       Dockerfiles, docker-compose.yml, deployment config
+docs        product, architecture, data, security and workflow docs
+```
+
+The two apps are independent npm workspaces. The web app never imports backend
+source; it talks to the API over JSON described in
+[`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md).
+
 ## What works today
 
 - **Campaign discovery** at `/campaigns`: filter by community and category, sort
-  by closing date or progress, and see the current tier price per campaign.
-- **Campaign detail** at `/campaigns/:slug`: all price tiers, current tier,
-  unit progress against the group minimum, deadline and sample delivery date.
-- **Read-only campaign API**: `GET /api/campaigns` and
-  `GET /api/campaigns/:slug`, both served by the Worker and tagged
-  `previewOnly: true`.
-- **Server-side tier pricing** in integer paise, with focused unit tests.
+  by closing date or progress, current tier price per campaign.
+- **Campaign detail** at `/campaigns/[slug]`: all tiers, current tier, progress
+  against the group minimum, deadline, delivery date, and a quantity calculator
+  that asks the API to price the line server-side.
+- **Catalogue** at `/shop` and `/product/[slug]`, backed by the API.
+- **Persisted sample data**: categories, products, societies, campaigns and
+  price tiers are stored with TypeORM and served by NestJS.
+- **Health check** at `/api/v1/health` reporting database connectivity.
 
 ## What is deliberately not live
 
-The campaign data is sample data shipped with the app. There are no accounts, no
-persisted commitments, no stock reservation, no payments and no verified
-suppliers. The catalogue shop and demo checkout are leftover starter-store
-surfaces, not marketplace functionality. Nothing here should be presented as a
-real offer, real saving, or real order.
+There are no accounts, sessions, roles, commitments, orders, stock reservations,
+payments or verified suppliers. The bag and checkout are a preview: checkout
+explains that ordering is not enabled and creates no order. Nothing here should
+be presented as a real offer, real saving, or real order.
 
-## Run it
+## Run it locally
 
-```sh
-bun install
-bun run dev        # http://localhost:5173
-bun run test       # focused campaign/pricing/API tests
-bun run typecheck  # strict TypeScript, no emit
-bun run build      # dist/client (assets) + dist/store/index.js (Worker)
+Requires Node.js 20+.
+
+```bash
+npm install
+
+# API (SQLite by default, no database server needed)
+cp apps/api/.env.example apps/api/.env
+npm run migration:run -w apps/api
+npm run seed -w apps/api
+npm run dev -w apps/api          # http://localhost:4000/api/v1
+
+# Web (separate terminal)
+cp apps/web/.env.example apps/web/.env.local
+npm run dev -w apps/web          # http://localhost:3000
 ```
 
-## Layout
+Root helpers: `npm run typecheck`, `npm run test`, `npm run build`, and
+`npm run seed`.
 
-- `src/data/campaigns.ts` — sample campaigns plus tier-pricing and progress
-  helpers. Money is integer paise; formatting is `en-IN` rupees.
-- `src/data/products.ts` — the product catalogue backing campaigns.
-- `src/app/pages/*` — screens; `src/app/components/*` — nav, bag, cards, footer.
-- `src/worker/index.ts` — Hono Worker: campaign preview API, legacy demo order
-  and newsletter handlers, then static assets.
-- `tests/campaigns.test.mjs` — tier boundaries, progress, and API contract.
+To exercise the PostgreSQL target locally, use
+`docker compose -f infra/docker-compose.yml up db` and set
+`DB_DRIVER=postgres` plus `DATABASE_URL` in `apps/api/.env`.
 
-## Deploy with Freebuff Sites
+## Verification commands
 
-`deploy.json` points at the build output. After `bun run build`, deploy with the
-`sites_deploy` tool from this directory.
+```bash
+npm run typecheck        # both apps
+npm run test             # API unit + integration tests (SQLite)
+npm run build            # API compile and Next.js production build
+```
+
+## Deploy
+
+- **Frontend** → Vercel, root directory `apps/web`, with `API_URL` and
+  `NEXT_PUBLIC_API_URL` pointing at the API.
+- **Backend** → Render Web Service built from `infra/api.Dockerfile`, with a
+  managed PostgreSQL `DATABASE_URL` and `CORS_ORIGINS` set to the web origin.
+- **Containers** → `docker compose -f infra/docker-compose.yml up --build`.
+
+Full environment variables, migration steps and free-tier caveats are in
+[`docs/DEPLOYMENT_OPERATIONS.md`](docs/DEPLOYMENT_OPERATIONS.md). Never commit
+real secrets; only `.env.example` placeholders belong in the repository.

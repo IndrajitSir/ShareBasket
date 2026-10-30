@@ -30,5 +30,14 @@ Initial market India/INR; pilot starts with a small number of societies in one c
 - **Docs/tests updated:** `PRODUCT.md` (prototype scope), `API_CONTRACTS.md` (implemented preview endpoints), `ROADMAP.md`, `TODO.md` (P0-03, P0-03a, P0-09), `tests/campaigns.test.mjs`.
 - **Revisit trigger:** Before real supplier/buyer data or any persistence requirement — decide between D1 on Workers and a separately hosted NestJS/PostgreSQL API. This is a product-owner decision, so it is recorded rather than assumed.
 
+### 2026-10-30 — Monorepo restructure with a real API
+- **Context:** The prototype was a single Vite/React SPA with a Hono Worker. The product requires an independently deployable Next.js frontend and NestJS backend, and the user requested Docker images plus free Vercel/Render hosting.
+- **Options:** (a) keep the Worker and proxy to a hosted database, (b) restructure into `apps/web` (Next.js App Router) + `apps/api` (NestJS) + `infra` Docker assets, (c) defer the backend and only move files.
+- **Chosen:** (b). Catalogue and campaigns are now persisted through TypeORM and served by NestJS under `/api/v1`; the Next.js app fetches those endpoints server-side for pages and browser-side for the quantity quote.
+- **Money representation:** authoritative amounts are integer **paise** in the database and API, never floating point. Formatting to `₹` happens at the presentation boundary. This satisfies the decimal-safety rule without a decimal column driver difference between SQLite and PostgreSQL.
+- **Database drivers:** PostgreSQL is the deployment target. SQLite (`better-sqlite3`) is supported for local development and automated tests because this workspace cannot run a PostgreSQL server; the same TypeORM entities and migration run on both. The PostgreSQL deployment path is implemented but not exercised in this environment — see the session report.
+- **Trade-offs:** No authentication, orders, payments, inventory or commitment writes yet. The cart and checkout remain a clearly labelled preview with no order API. The old Hono Worker, Vite SPA, Cloudflare deploy manifest and their tests were removed rather than left as a second implementation.
+- **Revisit trigger:** Before any buyer/supplier data or write endpoint — add identity, scope-aware authorization, idempotency and transaction tests. Validate the API against a real PostgreSQL instance (Docker/Render/Neon) before declaring deployment ready.
+
 ## Decision log template
 Date; decision; context; options; chosen option/rationale; trade-offs; docs/code/tests updated; revisit trigger. Convert assumptions to decisions explicitly; never present an assumption as fact.
