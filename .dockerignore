@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/data
+**/coverage
+.git
+.gitignore
+.wrangler
+*.sqlite
+*.log
+.env
+.env.*
+!.env.example
+Dockerfile*
+docker-compose*.yml

@@ -1,0 +1,65 @@
+# Run from the repository root:
+#   docker compose -f infra/docker-compose.yml up --build
+# Demo-only settings (auto-migrate, sample seed into "production") are labelled
+# below; remove them for any environment that stores real data.
+
+name: sharebasket
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sharebasket
+      POSTGRES_PASSWORD: sharebasket
+      POSTGRES_DB: sharebasket
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sharebasket -d sharebasket']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_DRIVER: postgres
+      DATABASE_URL: postgres://sharebasket:sharebasket@db:5432/sharebasket
+      DATABASE_SSL: 'false'
+      PORT: '4000'
+      CORS_ORIGINS: http://localhost:3000
+      # Demo automation only.
+      MIGRATE_ON_BOOT: 'true'
+      SEED_ON_BOOT: 'true'
+      SEED_ALLOW_PRODUCTION: 'true'
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/web.Dockerfile
+      args:
+        # Baked into the browser bundle; rebuild to point at another API host.
+        NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:4000/api/v1
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
