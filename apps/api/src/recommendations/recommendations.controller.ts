@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common'
 import type { Request } from 'express'
 
 import type { PublicUser } from '../auth/auth.types'
@@ -23,9 +23,11 @@ export class RecommendationsController {
     return resolveRequestUser(this.auth, request).then((user) => this.recommendations.forUser(user))
   }
 
-  @Get('nearby')
+  /** Coordinates go in the body so they never appear in URLs or access logs. */
+  @Post('nearby')
+  @HttpCode(200)
   @UseGuards(SessionAuthGuard)
-  nearby(@Req() request: SessionRequest, @Query() query: NearbyGroupsDto) {
-    return this.recommendations.nearby(request.user!.id, query)
+  nearby(@Req() request: SessionRequest, @Body() body: NearbyGroupsDto) {
+    return this.recommendations.nearby(request.user!.id, body)
   }
 }

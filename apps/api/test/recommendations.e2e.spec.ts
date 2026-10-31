@@ -170,16 +170,19 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
 
   it('requires a session and consent-shaped coordinates for nearby search', async () => {
     await request(server)
-      .get('/api/v1/recommendations/nearby?latitude=12.9698&longitude=77.75')
+      .post('/api/v1/recommendations/nearby')
+      .send({ latitude: 12.9698, longitude: 77.75 })
       .expect(401)
 
     const agent = await register('recommend-nearby@example.com')
     await agent
-      .get('/api/v1/recommendations/nearby?latitude=120&longitude=77.75')
+      .post('/api/v1/recommendations/nearby')
+      .send({ latitude: 120, longitude: 77.75 })
       .expect(400)
-    await agent.get('/api/v1/recommendations/nearby?latitude=12.9698').expect(400)
+    await agent.post('/api/v1/recommendations/nearby').send({ latitude: 12.9698 }).expect(400)
     await agent
-      .get('/api/v1/recommendations/nearby?latitude=28.6139&longitude=77.209')
+      .post('/api/v1/recommendations/nearby')
+      .send({ latitude: 28.6139, longitude: 77.209 })
       .expect(200)
       .expect(({ body }) => expect(body.groups).toEqual([]))
   })
@@ -188,7 +191,8 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
     const agent = await register('recommend-nearby-groups@example.com')
 
     const close = await agent
-      .get('/api/v1/recommendations/nearby?latitude=12.9698&longitude=77.75&radiusKm=5')
+      .post('/api/v1/recommendations/nearby')
+      .send({ latitude: 12.9698, longitude: 77.75, radiusKm: 5 })
       .expect(200)
     expect(close.body.radiusKm).toBe(5)
     expect(close.body.groups.map((group: { name: string }) => group.name)).toEqual([MAPLE])
@@ -204,7 +208,8 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
     await agent.post(`/api/v1/me/groups/${mapleId}`).expect(201)
 
     const afterJoining = await agent
-      .get('/api/v1/recommendations/nearby?latitude=12.9698&longitude=77.75&radiusKm=20')
+      .post('/api/v1/recommendations/nearby')
+      .send({ latitude: 12.9698, longitude: 77.75, radiusKm: 20 })
       .expect(200)
     expect(afterJoining.body.groups.map((group: { id: string }) => group.id)).not.toContain(mapleId)
     expect(afterJoining.body.groups.length).toBeGreaterThan(0)
