@@ -10,4 +10,11 @@ export class Society {
 
   @Column({ type: 'varchar', length: 120 })
   location: string
+
+  /** Used only for server-side proximity; never returned by nearby search. */
+  @Column({ type: 'float', nullable: true })
+  latitude: number | null
+
+  @Column({ type: 'float', nullable: true })
+  longitude: number | null
 }

@@ -1,6 +1,11 @@
 import type { DataSource } from 'typeorm'
 
-import { SEED_CAMPAIGNS, SEED_CATEGORIES, SEED_PRODUCTS } from './seed-data'
+import {
+  SEED_CAMPAIGNS,
+  SEED_CATEGORIES,
+  SEED_PRODUCTS,
+  SEED_SOCIETY_COORDINATES,
+} from './seed-data'
 import { Campaign } from './entities/campaign.entity'
 import { CampaignPriceTier } from './entities/campaign-price-tier-detail.entity'
 import { CampaignProduct } from './entities/campaign-product.entity'
@@ -68,10 +73,13 @@ export async function seedDatabase(
 
     for (const seed of SEED_CAMPAIGNS) {
       const existingSociety = await societyRepo.findOne({ where: { name: seed.society } })
+      const coordinates = SEED_SOCIETY_COORDINATES[seed.society]
       const society = await societyRepo.save(
         societyRepo.merge(existingSociety ?? societyRepo.create(), {
           name: seed.society,
           location: seed.location,
+          latitude: coordinates?.latitude ?? null,
+          longitude: coordinates?.longitude ?? null,
         }),
       )
 

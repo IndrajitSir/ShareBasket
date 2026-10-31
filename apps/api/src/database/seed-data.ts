@@ -39,6 +39,13 @@ export interface SeedCampaign {
   tiers: { minimumUnits: number; unitPricePaise: number }[]
 }
 
+/** Synthetic Bengaluru coordinates for sample societies; not verified addresses. */
+export const SEED_SOCIETY_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+  'Maple Residency': { latitude: 12.9698, longitude: 77.75 },
+  'Lakeview Enclave': { latitude: 12.925, longitude: 77.676 },
+  'Cedar Gardens': { latitude: 12.901, longitude: 77.783 },
+}
+
 export const SEED_CATEGORIES: SeedCategory[] = [
   { key: 'pantry', label: 'Pantry', blurb: 'Everyday staples, bought together', image: '/images/rice.svg', sortOrder: 1 },
   { key: 'ceramics', label: 'Ceramics', blurb: 'Thrown and glazed by hand', image: '/images/carafe.jpg', sortOrder: 2 },
