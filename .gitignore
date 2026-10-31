@@ -12,3 +12,6 @@ data
 .env
 .env.*
 !.env.example
+
+# TypeScript incremental build metadata
+*.tsbuildinfo
