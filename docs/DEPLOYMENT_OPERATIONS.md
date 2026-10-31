@@ -18,6 +18,15 @@ docker build -f infra/web.Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api
 docker compose -f infra/docker-compose.yml up --build
 ```
 
+## Verification status
+`docker compose -f infra/docker-compose.yml config` was run and exited 0, so the topology parses. The images were **not built** and the stack was **not started** in the development environment used for this change: the Docker daemon socket returned permission denied. PostgreSQL migrations/seeds were exercised only on SQLite. Render and Vercel were not deployed. Treat the Dockerfiles and blueprints as reviewed but unproven until the build, PostgreSQL and cloud smoke checks in `TODO.md` (P0-16, P0-18) pass.
+
+## Free-tier caveats
+- Render free web services sleep after inactivity, so the first request after idle is slow; health checks may wake the service.
+- Render's free PostgreSQL offer and retention windows change; confirm the current plan limits before relying on it. A free database may expire and lose data.
+- Vercel preview deployments use unique hostnames. Browser requests from each preview origin must be added to `CORS_ORIGINS`, or routed through a same-origin proxy, before browser-side quote calls work.
+- `NEXT_PUBLIC_API_URL` is baked into the browser bundle at build time; changing the API origin requires a rebuild/redeploy of the web app.
+
 ## Environment contract
 API (`apps/api/.env.example`):
 - `PORT` (default 4000), `NODE_ENV`.
@@ -42,10 +51,10 @@ Secrets are set in the hosting dashboards (Vercel env vars, Render env vars). Ne
 For the PostgreSQL path use `docker compose -f infra/docker-compose.yml up db` then run the same migration/seed commands with `DB_DRIVER=postgres` and a local `DATABASE_URL`.
 
 ## Render backend
-1. Create a Render PostgreSQL instance and copy its internal connection string.
-2. Create a Web Service from this repository with **Docker** runtime, Dockerfile path `infra/api.Dockerfile`, no build command, and health check path `/api/v1/health`.
-3. Set `DB_DRIVER=postgres`, `DATABASE_URL`, `DATABASE_SSL=true`, `CORS_ORIGINS` and (server-side only) any future provider keys.
-4. Run `npm run migration:run -w apps/api` once as a Render shell/job before the first traffic; the server itself does not migrate automatically.
+1. Create a Render PostgreSQL instance and copy its internal connection string, or import the included `render.yaml` blueprint, which provisions the database and the Docker web service together.
+2. Create (or let the blueprint create) a Web Service from this repository with **Docker** runtime, Dockerfile path `infra/api.Dockerfile`, no build command, and health check path `/api/v1/health`.
+3. Set `DB_DRIVER=postgres`, `DATABASE_URL`, `DATABASE_SSL=true`, `CORS_ORIGINS` and (server-side only) any future provider keys. Keep secrets in the Render dashboard, never in `render.yaml`.
+4. For a demo, the blueprint sets `MIGRATE_ON_BOOT`, `SEED_ON_BOOT` and `SEED_ALLOW_PRODUCTION` so the schema and synthetic sample data exist immediately. For any environment holding real data, remove those flags and run `npm run migration:run -w apps/api` once as a Render job/shell before the first traffic; the server does not migrate by default.
 
 ## Vercel frontend
 1. Import the repository as a Vercel project and set the root directory to `apps/web`; the Next.js preset detects the workspace build.

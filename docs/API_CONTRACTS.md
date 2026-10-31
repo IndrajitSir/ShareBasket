@@ -10,7 +10,7 @@ Auth: register/login/logout/refresh/verify/recovery/sessions. Users: current pro
 ## Current implementation (NestJS, read-only preview)
 Implemented under `/api/v1` by `apps/api`. All responses are JSON, every response carries an `X-Request-Id` header, and errors use the format above with a stable `code`.
 
-- `GET /health` — liveness plus database connectivity. Returns `{ status, database, uptimeSeconds }`; `503` when the database is unreachable.
+- `GET /health` — liveness plus database connectivity. Returns `{ status, database, latencyMs, uptimeSeconds }` (`latencyMs` only when the probe succeeds); `503` with `status: "degraded"` when the database is unreachable.
 - `GET /categories` — `{ categories: [{ key, label, blurb, image, productCount }] }`.
 - `GET /products?category=&limit=&offset=` — paginated `{ items, page: { limit, offset, total } }`; `limit` 1–60, default 24. Unknown category returns an empty page, malformed values return `400 VALIDATION_ERROR`.
 - `GET /products/:slug` — `{ product }` or `404 NOT_FOUND`.

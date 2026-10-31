@@ -1,5 +1,11 @@
 # Testing Strategy
 Follow the authoritative **Incremental Development, Testing, and Git Commit Policy** in `AGENT_RULES.md`. Verify each meaningful change with the smallest sufficient checks before committing; record the actual checks, results, commit hash and any blockers in `TODO.md`. Do not claim unrun or failing checks passed.
+## Current commands
+These scripts exist in the repository and run from the root: `npm run typecheck` (both apps, `tsc --noEmit`), `npm test` (API Jest unit and integration tests on a temporary SQLite database), `npm run build` (NestJS compile and Next.js production build), and `docker compose -f infra/docker-compose.yml config` (container topology syntax without starting services). The API also supports `npm run migration:run -w apps/api` and `npm run seed -w apps/api` for a fresh database.
+
+## Current coverage and limits
+The API suite covers tier selection and paise formatting, progress and next-tier calculations, quote boundaries and closed campaigns, plus integration cases for health, request IDs, campaign filtering, pagination, detail/not-found, quote validation, CORS and unknown API routes. The frontend has no automated component tests yet; it is covered by typecheck, the production build and manual checks against the running API. Image builds, the PostgreSQL path and cloud deployments are not verified in this environment because the Docker socket is inaccessible and no PostgreSQL server is available; record that limitation instead of claiming those checks passed.
+
 ## Test layers
 Unit: pricing/tiers, permissions, transitions, fees. Integration: repositories, migrations, transaction/outbox, provider adapters. API: DTO validation, auth, scope, error contract and pagination. E2E: register, join society, campaign discovery, checkout, sandbox payment, fulfilment, support/refund. Frontend accessibility/component tests. Load/concurrency tests for order creation, stock and webhooks before launch.
 

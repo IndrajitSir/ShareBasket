@@ -78,7 +78,12 @@ npm run build            # API compile and Next.js production build
   `NEXT_PUBLIC_API_URL` pointing at the API.
 - **Backend** → Render Web Service built from `infra/api.Dockerfile`, with a
   managed PostgreSQL `DATABASE_URL` and `CORS_ORIGINS` set to the web origin.
+  [`render.yaml`](render.yaml) provisions the API and database as a Blueprint.
 - **Containers** → `docker compose -f infra/docker-compose.yml up --build`.
+
+`docker compose -f infra/docker-compose.yml config` is verified. The images were
+not built here because the Docker daemon socket is inaccessible, so run the build
+commands on a machine with Docker before relying on them.
 
 Full environment variables, migration steps and free-tier caveats are in
 [`docs/DEPLOYMENT_OPERATIONS.md`](docs/DEPLOYMENT_OPERATIONS.md). Never commit

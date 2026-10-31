@@ -4,6 +4,8 @@ Outcome-based phases; code existence alone does not mean a phase is complete. De
 ## Phase 0 — Foundation
 Inspect repo; choose ORM/auth/contracts; set up apps, environment validation, local DB, migrations/seeds, tests, lint/typecheck/build and CI. Break setup into independently verifiable units (for example, environment validation, one migration, and one CI check at a time); verify and commit each coherent unit. Exit: fresh contributor can run everything locally; decisions documented and checks pass. The initial UI-only sample campaigns are explicitly a prototype, not the real domain or persistence layer.
 
+**Status (2026-10-31):** the workspaces, NestJS API, Next.js storefront, SQLite/PostgreSQL schema, seeds, tests and container/Render/Vercel assets are delivered and committed. Lint/format scripts, CI, a real PostgreSQL run and cloud smoke tests remain (`P0-07`, `P0-16`, `P0-17`, `P0-18` in `TODO.md`); Phase 0 is not complete until those pass.
+
 ## Phase 1 — Identity and community
 Auth/profile/session; scope-aware RBAC; society and membership/invite approval; audit role/membership changes. Implement in small vertical slices, each with focused authorization tests and reviewable commits. Exit: negative tests pass across two users and societies.
 
