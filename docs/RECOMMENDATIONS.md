@@ -57,6 +57,13 @@ The Next.js page renders three labelled sections: **What your neighbours are buy
 
 A signed-in member with no group sees **Your group picks start with a group** and the nearby panel. The panel requests browser location only when **Use my location** is pressed; it handles permission denial, unavailable location and a 1–50 km radius, then lists groups with a rounded distance, member count, open campaign count and the busiest campaign. A member can join a nearby group in place, after which the page reloads with the personalized sections. Users can browse every group buy without ever sharing a location.
 
+## Signal writes, deduplication and rate limiting
+A quote stores implicit interest only. One row exists per `(member, campaign)` in `user_campaign_signal_detail`, enforced by the unique index `uq_signal_user_campaign`; a repeated quote updates that row's bounded weight (1–20) instead of adding a second data point. Peer counts and weights therefore cannot be inflated by quoting the same campaign repeatedly. The migration that introduces the index also collapses any pre-existing duplicates, keeping the highest quoted quantity.
+
+Signal writes are additionally rate-limited per member with an in-process sliding window: default **30 signals per minute**, configurable with `SIGNAL_RATE_LIMIT_PER_MINUTE` (validated integer 0–10000, `0` disables). A denied write is skipped and never fails the quote response. Unknown campaign slugs are ignored before consuming a slot. Because the counter is in-process, a multi-replica deployment applies the limit per replica; move the counter to a shared store only when a measured abuse pattern requires it.
+
+The limiter is deliberately about write amplification, not authorization: any signed-in member may quote. Quote spam protection for the quote endpoint itself and login/registration rate limiting remain separate hardening tasks (`P1-02`).
+
 ## Membership semantics
 `GET /me/groups`, `POST /me/groups/:societyId` and `DELETE /me/groups/:societyId`. This is a **preview membership**: joining is immediate and has no approval workflow, role grant or address verification. It exists so the recommendation branches are testable; `P1-01` still owns approval, scope-aware RBAC and audit.
 
@@ -67,12 +74,13 @@ The MVP loads open campaigns, memberships and quote signals and scores them in m
 - Cache anonymous trending per city for a short TTL and invalidate on campaign changes.
 - Keep the API stateless; do not add a model server until measured latency or model complexity requires it.
 - AWS: run the same `infra/api.Dockerfile` on ECS Fargate/App Runner with RDS PostgreSQL; put Next.js on Vercel, Amplify or the same cluster. VM: run both images with `infra/docker-compose.yml` behind a TLS reverse proxy.
-- No recommendation writes occur on `GET`; quote signals are best-effort inserts after successful quotes and never block the quote response. Writes also emit no coordinate data.
+- No recommendation writes occur on `GET`; quote signals are best-effort upserts after successful quotes and never block the quote response. Writes also emit no coordinate data.
 - The `/for-you` page is dynamic per request; do not add a shared cache without keying by session and invalidating on membership or campaign changes.
 
 ## Explicit limits
 - Sample campaigns are not real purchases, and `unitsCommitted` is synthetic demand.
 - Quote signals are implicit interest, not proof of purchase.
 - No A/B testing, fairness audit, explanation evaluation or model monitoring yet.
-- A malicious user could skew peer signals by quoting repeatedly; rate limiting and signal deduplication are tracked in `TODO.md`.
+- Quote signals are deduplicated per member and campaign and rate-limited per member per minute. A distributed attacker with many accounts could still add weak signals; account-level abuse controls and signal ageing are not implemented.
+- The rate limiter is per API instance, not shared across replicas.
 - Recommendation explanations must stay honest: never claim personalisation that did not run or invent savings.

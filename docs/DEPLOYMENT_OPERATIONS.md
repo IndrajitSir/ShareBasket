@@ -60,6 +60,7 @@ API (`apps/api/.env.example`):
 - `CORS_ORIGINS` = comma-separated browser origins, e.g. `http://localhost:3000,https://your-app.vercel.app`. Wildcards are not supported and must not be combined with credentials.
 - `SEED_ON_BOOT=true` for a demo environment only; production data must be seeded intentionally with `npm run seed -w apps/api`.
 - `AUTH_SECRET` — at least 32 random characters used to sign session JWTs. **Required in production**; the API refuses to start without it. Generate with `openssl rand -base64 48` and store it only in the hosting dashboard.
+- `SIGNAL_RATE_LIMIT_PER_MINUTE` — implicit quote signals accepted per member per minute (default 30, integer 0–10000; `0` disables). Counters are per API instance, so set it deliberately when scaling replicas.
 - `PUBLIC_WEB_URL` — the browser origin of the web app, e.g. `http://localhost:3000` or `https://your-app.vercel.app`. Used for OAuth redirect URIs and post-login redirects. No trailing path.
 - `SESSION_COOKIE_SECURE` — defaults to `true` when `NODE_ENV=production`. Set `false` only for a plain-HTTP local compose demo; HTTPS deployments must leave it secure.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — optional pair; both must be set or both omitted.
