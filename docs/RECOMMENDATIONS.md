@@ -9,7 +9,7 @@ The product has no orders or payment history yet, so a trained purchase model wo
 4. **Proximity** — Haversine distance between the browser's consented location and known society coordinates.
 5. **Urgency** — campaigns closing sooner rank slightly higher.
 
-There is no Python service, model server, GPU, vector database or external ML API. Scoring runs in the NestJS process against PostgreSQL, so the same container works on Render, AWS and a VM. As real commitment/order data arrives, the same interfaces can be fed by an offline job that precomputes co-occurrence tables; the API contract does not change.
+There is no Python service, model server, GPU, vector database or external ML API. Scoring runs in the NestJS process against PostgreSQL, so the same container works on Render, AWS and a VM. The session-independent parts — anonymous trending and item-item co-occurrence — are already precomputed into a persisted snapshot (below), so an offline job can later take over the same interfaces without changing the API contract.
 
 ## Sections returned
 `GET /api/v1/recommendations/for-you` (optional session cookie):
@@ -64,14 +64,31 @@ Signal writes are additionally rate-limited per member with an in-process slidin
 
 The limiter is deliberately about write amplification, not authorization: any signed-in member may quote. Quote spam protection for the quote endpoint itself and login/registration rate limiting remain separate hardening tasks (`P1-02`).
 
+## Precomputed snapshot cache
+`RecommendationSnapshotsService` keeps the expensive, session-independent half of the model out of the request path. `buildRecommendationSnapshot` makes one deterministic pass over open campaigns and quote signals and produces:
+
+- the anonymous **trending order** (`0.85 × demand + 0.15 × urgency`, top 50), and
+- symmetric **item-item affinity** edges (co-quote cosine similarity, the 10 strongest neighbours per campaign).
+
+The payload is stored as one JSON row in `recommendation_snapshot` (scope `global`, with a monotonically increasing `version`) and served from memory while fresh:
+
+- **TTL** — 5 minutes. An expired row is rebuilt on the next read.
+- **Restart** — a fresh persisted row is reused, so a new instance or replica does not recompute on boot.
+- **Invalidation** — a successful quote signal write drops the cache and schedules one debounced (1 s) background rebuild. The next read resolves it synchronously if the timer has not fired; a burst of quotes therefore causes one rebuild, not one per write.
+- **Failure** — if the snapshot cannot be read or rebuilt, `/for-you` logs a warning and ranks with the per-request signal scan it already loads. A cache problem degrades ordering quality, never the page.
+- **Scope** — only trending and affinities are shared. The caller's own quoted campaigns and neighbour weights still come from the request's signal load, so nothing personal is stored in the shared row.
+
+The cache is in-process with a database-backed copy, so replicas each hold their own memory copy but agree on the persisted payload; no Redis or worker process is required. Budgets are enforced by `apps/api/test/recommendation-latency.spec.ts`: a snapshot over 800 campaigns and 1,200 signals must build in under 1.5 s, ranking the full candidate set in under 750 ms, and a warm read must average under 5 ms with zero database queries.
+
 ## Membership semantics
 `GET /me/groups`, `POST /me/groups/:societyId` and `DELETE /me/groups/:societyId`. This is a **preview membership**: joining is immediate and has no approval workflow, role grant or address verification. It exists so the recommendation branches are testable; `P1-01` still owns approval, scope-aware RBAC and audit.
 
 ## Scalability and deployment
-The MVP loads open campaigns, memberships and quote signals and scores them in memory. That is appropriate for a pilot with a handful of societies. Before large catalogues:
+The MVP loads open campaigns, memberships and quote signals and scores them in memory. That is appropriate for a pilot with a handful of societies, and the snapshot cache now keeps co-occurrence and trending ordering off the request path. It does **not** yet bound the request-time signal load:
 
-- Precompute item-item co-occurrence and group demand into summary tables on a schedule; keep request-time work to a bounded top-N read.
-- Cache anonymous trending per city for a short TTL and invalidate on campaign changes.
+- `/for-you` still reads all open campaigns, all memberships and all quote signals per request and builds the personal peer index in memory. Store per-campaign popularity aggregates in the snapshot and read only the caller's own signals plus its groups' peers before the catalogue grows.
+- Trending is global. Add a per-city snapshot scope only when a city's catalogue is large enough for one order to be wrong elsewhere.
+- Snapshot rebuild cost grows with signal count; if writes become frequent, move the rebuild to a scheduled job or a queue worker and keep the API read-only.
 - Keep the API stateless; do not add a model server until measured latency or model complexity requires it.
 - AWS: run the same `infra/api.Dockerfile` on ECS Fargate/App Runner with RDS PostgreSQL; put Next.js on Vercel, Amplify or the same cluster. VM: run both images with `infra/docker-compose.yml` behind a TLS reverse proxy.
 - No recommendation writes occur on `GET`; quote signals are best-effort upserts after successful quotes and never block the quote response. Writes also emit no coordinate data.
