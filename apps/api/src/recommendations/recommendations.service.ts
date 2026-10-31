@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 
@@ -16,6 +16,7 @@ import {
   type CandidateCampaign,
   type RecommendationItem,
 } from './recommendation-engine'
+import { RecommendationSnapshotsService } from './recommendation-snapshots.service'
 
 const RELATIONS = {
   society: true,
@@ -67,6 +68,8 @@ export interface NearbyGroup {
 
 @Injectable()
 export class RecommendationsService {
+  private readonly logger = new Logger(RecommendationsService.name)
+
   constructor(
     @InjectRepository(Campaign) private readonly campaigns: Repository<Campaign>,
     @InjectRepository(CampaignSignal)
@@ -75,15 +78,26 @@ export class RecommendationsService {
     private readonly memberships: Repository<SocietyMembership>,
     @InjectRepository(Society) private readonly societies: Repository<Society>,
     private readonly membershipsService: MembershipsService,
+    private readonly snapshots: RecommendationSnapshotsService,
   ) {}
 
   async forUser(user: PublicUser | null) {
     const now = new Date()
-    const [groups, candidates, memberships, signals] = await Promise.all([
+    const [groups, candidates, memberships, signals, snapshot] = await Promise.all([
       user ? this.membershipsService.listForUser(user.id) : Promise.resolve([]),
       this.loadCandidates(now),
       this.memberships.find({ select: { userId: true, societyId: true } }),
       this.loadSignals(),
+      // A cache failure must not take the whole page down: ranking falls back
+      // to scanning the signals it already loaded.
+      this.snapshots.get().catch((error: unknown) => {
+        this.logger.warn(
+          `Serving recommendations without the snapshot cache: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        )
+        return null
+      }),
     ])
 
     const ranked = rankRecommendations({
@@ -93,6 +107,8 @@ export class RecommendationsService {
       memberships,
       signals,
       now,
+      affinities: snapshot?.affinities,
+      trendingOrder: snapshot?.trending,
     })
 
     const needsGroup = Boolean(user) && groups.length === 0

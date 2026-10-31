@@ -6,11 +6,13 @@ import { Campaign } from '../src/database/entities/campaign.entity'
 import { User } from '../src/database/entities/user.entity'
 import { seedDatabase } from '../src/database/seed-runner'
 import { SlidingWindowRateLimiter } from '../src/recommendations/signal-rate-limit'
+import type { RecommendationSnapshotsService } from '../src/recommendations/recommendation-snapshots.service'
 import { SignalsService } from '../src/recommendations/signals.service'
 
 describe('SignalsService quote writes', () => {
   let dataSource: DataSource
   let service: SignalsService
+  let invalidate: jest.Mock
 
   beforeAll(async () => {
     dataSource = new DataSource({
@@ -24,15 +26,21 @@ describe('SignalsService quote writes', () => {
     await dataSource.initialize()
     await seedDatabase(dataSource)
 
+    invalidate = jest.fn()
     service = new SignalsService(
       dataSource.getRepository(CampaignSignal),
       dataSource.getRepository(Campaign),
       new SlidingWindowRateLimiter(2),
+      { invalidate } as unknown as RecommendationSnapshotsService,
     )
   })
 
   afterAll(async () => {
     await dataSource.destroy()
+  })
+
+  beforeEach(() => {
+    invalidate.mockClear()
   })
 
   async function member(email: string): Promise<string> {
@@ -59,6 +67,7 @@ describe('SignalsService quote writes', () => {
 
     expect(await service.recordQuote(userId, 'filter-coffee', 2)).toBe(true)
     expect(await service.recordQuote(userId, 'filter-coffee', 5)).toBe(true)
+    expect(invalidate).toHaveBeenCalledTimes(2)
 
     const rows = await dataSource
       .getRepository(CampaignSignal)
@@ -76,6 +85,7 @@ describe('SignalsService quote writes', () => {
     expect(await service.recordQuote(userId, 'oat-milk-case', 1)).toBe(false)
 
     expect(await countFor(userId)).toBe(2)
+    expect(invalidate).toHaveBeenCalledTimes(2)
   })
 
   it('ignores unknown campaigns without consuming a rate-limit slot', async () => {
@@ -83,6 +93,7 @@ describe('SignalsService quote writes', () => {
 
     expect(await service.recordQuote(userId, 'not-a-campaign', 1)).toBe(false)
     expect(await countFor(userId)).toBe(0)
+    expect(invalidate).not.toHaveBeenCalled()
 
     expect(await service.recordQuote(userId, 'filter-coffee', 1)).toBe(true)
     expect(await service.recordQuote(userId, 'cold-pressed-oil', 1)).toBe(true)

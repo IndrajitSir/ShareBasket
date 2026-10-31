@@ -5,6 +5,7 @@ import { Repository } from 'typeorm'
 import { CampaignSignal } from '../database/entities/campaign-signal.entity'
 import { Campaign } from '../database/entities/campaign.entity'
 import { SIGNAL_RATE_LIMITER, SlidingWindowRateLimiter } from './signal-rate-limit'
+import { RecommendationSnapshotsService } from './recommendation-snapshots.service'
 
 @Injectable()
 export class SignalsService {
@@ -15,6 +16,7 @@ export class SignalsService {
     private readonly signals: Repository<CampaignSignal>,
     @InjectRepository(Campaign) private readonly campaigns: Repository<Campaign>,
     @Inject(SIGNAL_RATE_LIMITER) private readonly limiter: SlidingWindowRateLimiter,
+    private readonly snapshots: RecommendationSnapshotsService,
   ) {}
 
   /**
@@ -43,6 +45,9 @@ export class SignalsService {
       },
       { conflictPaths: ['userId', 'campaignId'] },
     )
+    // New co-quote evidence changes affinity and trending. Rebuild lazily in
+    // the background; the next read either sees the old or the new snapshot.
+    this.snapshots.invalidate()
     return true
   }
 
