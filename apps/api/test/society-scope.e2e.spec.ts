@@ -106,6 +106,12 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
     const response = await plainMember.get(`/api/v1/societies/${mapleId}/members`).expect(200)
 
     expect(response.body.societyId).toBe(mapleId)
+    expect(response.body.society).toMatchObject({
+      id: mapleId,
+      name: 'Maple Residency',
+      location: 'Bengaluru · Whitefield',
+      memberCount: 2,
+    })
     expect(response.body.viewerRole).toBe('MEMBER')
     expect(response.body.members).toHaveLength(2)
     expect(response.body.members[0]).toMatchObject({ userId: stewardId, role: 'STEWARD' })

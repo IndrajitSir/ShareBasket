@@ -1,4 +1,4 @@
-import { ArrowRight, Info, Sparkles, UsersRound } from 'lucide-react'
+import { ArrowRight, Info, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -76,13 +76,19 @@ export default async function ForYouPage() {
             <UsersRound className="size-3.5" aria-hidden /> Your groups:
           </span>
           {data.groups.map((group) => (
-            <span
+            <Link
               key={group.id}
-              className="rounded-full border border-line-strong bg-bg px-3 py-1.5 text-fg"
+              href={`/groups/${group.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-bg px-3 py-1.5 text-fg transition-colors hover:border-fg"
             >
               {group.name}
-              <span className="ml-1.5 text-muted">{group.memberCount}</span>
-            </span>
+              <span className="text-muted">{group.memberCount}</span>
+              {group.role === 'STEWARD' && (
+                <span className="inline-flex items-center gap-1 text-[11.5px] text-accent">
+                  <ShieldCheck className="size-3" aria-hidden /> Steward
+                </span>
+              )}
+            </Link>
           ))}
         </div>
       )}
@@ -175,7 +181,9 @@ export default async function ForYouPage() {
             used in memory to sort groups by distance.
           </p>
           <p className="mt-1.5">
-            Membership here is a preview: joining is immediate, with no approval or address check.{' '}
+            Membership here is a preview: joining is immediate, with no approval or address check and
+            no email addresses shown on a roster. The first member of a group becomes its steward; a
+            steward can hand that role to another member of the same group and nothing more.{' '}
             <Link href="/about" className="underline underline-offset-2 hover:text-fg">
               Project notes
             </Link>

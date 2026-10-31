@@ -20,10 +20,15 @@ export class SocietiesController {
   /** Any member may see the roster of the society they belong to. */
   @Get(':societyId/members')
   async listMembers(@CurrentMembership() membership: { societyId: string; role: string }) {
+    const [society, members] = await Promise.all([
+      this.memberships.describe(membership.societyId),
+      this.memberships.listMembers(membership.societyId),
+    ])
     return {
       societyId: membership.societyId,
+      society,
       viewerRole: membership.role,
-      members: await this.memberships.listMembers(membership.societyId),
+      members,
     }
   }
 

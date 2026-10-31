@@ -137,6 +137,18 @@ export class MembershipsService {
     return (await this.societies.countBy({ id: societyId })) > 0
   }
 
+  /** Public group identity plus its member count, for the roster view. */
+  async describe(societyId: string) {
+    const society = await this.societies.findOne({ where: { id: societyId } })
+    if (!society) throw new NotFoundException('Group not found.')
+    return {
+      id: society.id,
+      name: society.name,
+      location: society.location,
+      memberCount: await this.memberships.countBy({ societyId }),
+    }
+  }
+
   /** The caller's role for one society, or null when they are not a member. */
   async roleFor(userId: string, societyId: string): Promise<SocietyRole | null> {
     const row = await this.memberships.findOne({

@@ -22,12 +22,16 @@ export interface RecommendedCampaign {
   source: RecommendationSource
 }
 
+/** Scoped to one society; never a platform-wide role. */
+export type SocietyRole = 'MEMBER' | 'STEWARD'
+
 export interface GroupSummary {
   id: string
   name: string
   location: string
   memberCount: number
   activeCampaigns: number
+  role: SocietyRole
 }
 
 export interface Recommendations {
