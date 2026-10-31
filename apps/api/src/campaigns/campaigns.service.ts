@@ -70,20 +70,42 @@ export class CampaignsService {
     @InjectRepository(Campaign) private readonly campaigns: Repository<Campaign>,
   ) {}
 
-  async list(options: { category?: string; society?: string; sort?: 'closing' | 'progress' }) {
+  async list(options: {
+    category?: string
+    society?: string
+    q?: string
+    sort?: 'closing' | 'progress'
+  }) {
     const campaigns = await this.campaigns.find({
       relations: RELATIONS,
       order: { closesAt: 'ASC' },
     })
 
+    const term = options.q?.trim().toLowerCase()
     const filtered = campaigns.filter((campaign) => {
       if (options.society && campaign.society.name !== options.society) return false
       if (options.category) {
-        return campaign.campaignProducts.some(
+        const inCategory = campaign.campaignProducts.some(
           (campaignProduct) => campaignProduct.product.category?.key === options.category,
         )
+        if (!inCategory) return false
       }
-      return true
+      if (!term) return true
+
+      const haystack = [
+        campaign.society.name,
+        campaign.society.location,
+        ...campaign.campaignProducts.flatMap((campaignProduct) => [
+          campaignProduct.product.name,
+          campaignProduct.product.shortDescription,
+          campaignProduct.product.description,
+          campaignProduct.product.category?.label ?? '',
+        ]),
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(term)
     })
 
     if (options.sort === 'progress') {

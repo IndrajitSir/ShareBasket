@@ -163,6 +163,41 @@ describe('API (SQLite, migrated schema, seeded)', () => {
     await request(app.getHttpServer()).get('/api/v1/products?limit=99').expect(400)
   })
 
+  it('searches products case-insensitively and treats wildcards literally', async () => {
+    const lower = await request(app.getHttpServer()).get('/api/v1/products?q=rice').expect(200)
+    expect(lower.body.items.map((item: { slug: string }) => item.slug)).toContain('basmati-rice')
+
+    const upper = await request(app.getHttpServer()).get('/api/v1/products?q=RICE').expect(200)
+    expect(upper.body.items.map((item: { slug: string }) => item.slug)).toEqual(
+      lower.body.items.map((item: { slug: string }) => item.slug),
+    )
+
+    const none = await request(app.getHttpServer()).get('/api/v1/products?q=nothing-matches-this').expect(200)
+    expect(none.body.items).toEqual([])
+    expect(none.body.page.total).toBe(0)
+
+    // `%` must not behave as a SQL wildcard.
+    const wildcard = await request(app.getHttpServer()).get('/api/v1/products?q=%25').expect(200)
+    expect(wildcard.body.items).toEqual([])
+
+    await request(app.getHttpServer()).get(`/api/v1/products?q=${'a'.repeat(81)}`).expect(400)
+  })
+
+  it('searches campaigns by product and community text', async () => {
+    const product = await request(app.getHttpServer()).get('/api/v1/campaigns?q=groundnut').expect(200)
+    expect(product.body.campaigns.map((campaign: { slug: string }) => campaign.slug)).toEqual([
+      'cold-pressed-oil',
+    ])
+
+    const community = await request(app.getHttpServer()).get('/api/v1/campaigns?q=MAPLE').expect(200)
+    expect(community.body.campaigns).toHaveLength(2)
+
+    const none = await request(app.getHttpServer()).get('/api/v1/campaigns?q=zzzz').expect(200)
+    expect(none.body.campaigns).toEqual([])
+
+    await request(app.getHttpServer()).get(`/api/v1/campaigns?q=${'a'.repeat(81)}`).expect(400)
+  })
+
   it('returns product detail and categories with counts', async () => {
     const product = await request(app.getHttpServer()).get('/api/v1/products/basmati-rice').expect(200)
     expect(product.body.product).toMatchObject({ slug: 'basmati-rice', pricePaise: 28900, category: 'pantry' })

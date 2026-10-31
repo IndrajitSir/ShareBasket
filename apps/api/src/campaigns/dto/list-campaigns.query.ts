@@ -13,6 +13,11 @@ export class ListCampaignsQuery {
   society?: string
 
   @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string
+
+  @IsOptional()
   @IsIn(['closing', 'progress'])
   sort?: 'closing' | 'progress'
 }

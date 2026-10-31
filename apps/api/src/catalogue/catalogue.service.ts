@@ -73,6 +73,17 @@ export class CatalogueService {
       .where('1 = 1')
 
     if (query.category) builder.andWhere('category.key = :category', { category: query.category })
+
+    const term = query.q?.trim()
+    if (term) {
+      // Escape LIKE wildcards so a query like "%" searches for a literal percent sign.
+      const escaped = term.replace(/[\\%_]/g, '\\$&').toLowerCase()
+      builder.andWhere(
+        "(LOWER(product.name) LIKE :term ESCAPE '\\' OR LOWER(product.shortDescription) LIKE :term ESCAPE '\\' OR LOWER(product.description) LIKE :term ESCAPE '\\')",
+        { term: `%${escaped}%` },
+      )
+    }
+
     if (query.minPricePaise !== undefined) {
       builder.andWhere('product.pricePaise >= :minPrice', { minPrice: query.minPricePaise })
     }

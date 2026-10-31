@@ -9,6 +9,11 @@ export class ListProductsQuery {
   category?: string
 
   @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
