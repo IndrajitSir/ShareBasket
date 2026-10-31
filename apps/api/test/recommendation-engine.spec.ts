@@ -54,6 +54,24 @@ describe('rankRecommendations', () => {
     expect(result.trending[0].reason).toBe('Trending in Maple Residency')
   })
 
+  it('shows cross-group picks to a signed-in member with no groups', () => {
+    const result = rankRecommendations({
+      userId: 'user-1',
+      userSocietyIds: [],
+      candidates: [
+        campaign({ slug: 'a', societyId: 'society-2', unitsCommitted: 80, minimumUnits: 100 }),
+        campaign({ slug: 'b', societyId: 'society-3', unitsCommitted: 20, minimumUnits: 100 }),
+      ],
+      memberships: [],
+      signals: [],
+      now: NOW,
+    })
+
+    expect(result.inYourGroups).toEqual([])
+    expect(result.otherGroups.map((item) => item.campaign.slug)).toEqual(['a', 'b'])
+    expect(result.otherGroups[0].source).toBe('OTHER_GROUPS')
+  })
+
   it('promotes what peers in the user groups quoted', () => {
     const result = rankRecommendations({
       userId: 'user-1',

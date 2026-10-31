@@ -253,7 +253,8 @@ export function rankRecommendations(input: RankingInput): RankingResult {
   )
 
   const inGroup = candidates.filter((campaign) => userSocietyIds.has(campaign.societyId))
-  const other = userSocietyIds.size
+  // Cross-group discovery needs an audience; anonymous visitors just get trending.
+  const other = input.userId
     ? candidates.filter((campaign) => !userSocietyIds.has(campaign.societyId))
     : []
   const trendingPool = candidates
@@ -321,11 +322,15 @@ export function rankRecommendations(input: RankingInput): RankingResult {
       reasonFor(campaign, 'TRENDING', 0, demandBySlug.get(campaign.slug) ?? 0),
   )
 
-  // If the user has no groups, do not invent an "other groups" section.
+  // A member without groups still sees what other communities are buying, but
+  // no in-group section and no claim of personalisation.
   const used = new Set<string>()
+  // Without an in-group section, cap cross-group picks so trending still has
+  // distinct products to show below them.
+  const otherLimit = userSocietyIds.size ? limit : Math.min(limit, 3)
   const result: RankingResult = {
     inYourGroups: userSocietyIds.size ? takeUnique(inGroupRanked, limit, used) : [],
-    otherGroups: userSocietyIds.size ? takeUnique(otherRanked, limit, used) : [],
+    otherGroups: input.userId ? takeUnique(otherRanked, otherLimit, used) : [],
     trending: takeUnique(trendingRanked, limit, used),
   }
 

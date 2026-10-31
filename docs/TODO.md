@@ -62,7 +62,7 @@ Recommendations are delivered end to end: an in-process hybrid engine over group
 Run from the repository root on a clean working tree:
 
 - `npm run typecheck` → exit 0 for `apps/api` and `apps/web`.
-- `npm test` → exit 0, 50 tests in 7 suites (pricing, config, recommendation engine, memberships, recommendations, catalogue/campaign and auth integration against a migrated SQLite database).
+- `npm test` → exit 0, 51 tests in 7 suites (pricing, config, recommendation engine, memberships, recommendations, catalogue/campaign and auth integration against a migrated SQLite database).
 - `npm run build` → exit 0 (NestJS compile and Next.js production build, including `/for-you`, `/login`, `/register`, `/account` and the auth proxy).
 - Live credentials flow through `http://localhost:3000/api/backend/auth/*`: register → `/auth/me` → `/account` returned 200 with a first-party HttpOnly cookie; login and logout were exercised in the browser.
 - Search: `/shop?q=rice` and `/campaigns?q=groundnut` returned the expected API-backed results.

@@ -107,7 +107,7 @@ export default async function ForYouPage() {
         </section>
       )}
 
-      {data.personalized && (
+      {data.signedIn && (
         <section className="pt-16" aria-labelledby="other-groups">
           <SectionTitle
             eyebrow="Across the city"

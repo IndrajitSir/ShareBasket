@@ -109,7 +109,8 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
     expect(response.body.needsLocation).toBe(true)
     expect(response.body.groups).toEqual([])
     expect(response.body.sections.inYourGroups).toEqual([])
-    expect(response.body.sections.otherGroups).toEqual([])
+    expect(response.body.sections.otherGroups.length).toBeGreaterThan(0)
+    expect(response.body.sections.otherGroups[0].source).toBe('OTHER_GROUPS')
     expect(response.body.sections.trending.length).toBeGreaterThan(0)
   })
 

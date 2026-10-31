@@ -15,7 +15,7 @@ There is no Python service, model server, GPU, vector database or external ML AP
 `GET /api/v1/recommendations/for-you` (optional session cookie):
 
 - `inYourGroups` — campaigns in the user's societies, ranked by other members' quote signals, campaign demand, similar-item affinity and urgency. The user's own quoted campaigns are excluded.
-- `otherGroups` — campaigns outside the user's societies, ranked by cross-group demand, collaborative affinity, urgency and same-city affinity.
+- `otherGroups` — campaigns outside the user's societies (every open campaign for a member with no groups, capped at three so trending keeps distinct products), ranked by cross-group demand, collaborative affinity, urgency and same-city affinity. Empty for signed-out visitors.
 - `trending` — cold-start fallback for anonymous users or users without signals.
 - `nearbyGroups` — **not** included here. It requires browser permission and a separate request.
 
@@ -42,7 +42,7 @@ trendingScore = 0.85 * demand + 0.15 * urgency
 
 `peerNorm` and `cfNorm` divide by the maximum in the candidate set. The top six per section are returned, de-duplicated by product. Every item carries a human `reason` such as `"3 neighbours quoted this"`, `"Minimum met in Maple Residency"` or `"Closest open group nearby"`.
 
-Cold start is deliberate: no membership shows nearby groups plus trending; no location shows trending with a permission prompt; no quote signals falls back to campaign demand.
+Cold start is deliberate: a signed-out visitor sees trending only; a signed-in member with no groups sees capped cross-group picks, the nearby-group prompt and trending, never an in-group claim; no location just means no distance sorting; no quote signals falls back to campaign demand.
 
 ## Proximity and privacy
 - The browser asks for location only after an explicit **Use my location** click. It never asks on page load.
