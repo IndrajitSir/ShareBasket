@@ -7,11 +7,13 @@ import { SocietyMembership } from '../database/entities/society-membership.entit
 import { Society } from '../database/entities/society.entity'
 import { MembershipsController } from './memberships.controller'
 import { MembershipsService } from './memberships.service'
+import { SocietiesController } from './societies.controller'
+import { SocietyScopeGuard } from './society-scope.guard'
 
 @Module({
   imports: [TypeOrmModule.forFeature([SocietyMembership, Society, Campaign]), AuthModule],
-  controllers: [MembershipsController],
-  providers: [MembershipsService],
-  exports: [MembershipsService],
+  controllers: [MembershipsController, SocietiesController],
+  providers: [MembershipsService, SocietyScopeGuard],
+  exports: [MembershipsService, SocietyScopeGuard],
 })
 export class MembershipsModule {}

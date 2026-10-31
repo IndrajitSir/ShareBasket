@@ -19,7 +19,7 @@ export function configureApp(app: INestApplication, options: { corsOrigins: stri
 
   app.enableCors({
     origin: options.corsOrigins,
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
     exposedHeaders: ['X-Request-Id'],
     credentials: false,

@@ -133,6 +133,10 @@ export class MembershipsService {
     await this.memberships.save(successor)
   }
 
+  async societyExists(societyId: string): Promise<boolean> {
+    return (await this.societies.countBy({ id: societyId })) > 0
+  }
+
   /** The caller's role for one society, or null when they are not a member. */
   async roleFor(userId: string, societyId: string): Promise<SocietyRole | null> {
     const row = await this.memberships.findOne({
