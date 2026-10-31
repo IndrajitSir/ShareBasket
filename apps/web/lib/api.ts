@@ -141,7 +141,7 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 export async function fetchCampaigns(
-  params: { category?: string; society?: string; sort?: string } = {},
+  params: { category?: string; society?: string; q?: string; sort?: string } = {},
 ): Promise<Campaign[]> {
   const data = await getJson<{ campaigns: Campaign[] }>(`/campaigns${query(params)}`)
   return data.campaigns
@@ -160,6 +160,7 @@ export async function fetchCampaign(slug: string): Promise<Campaign | null> {
 export async function fetchProducts(
   params: {
     category?: string
+    q?: string
     sort?: string
     limit?: number
     offset?: number

@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion } from 'motion/react'
-import { Menu, ShoppingBag, X } from 'lucide-react'
+import { Menu, Search, ShoppingBag, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -12,9 +12,6 @@ import { cx } from '@/lib/cx'
 const links = [
   { href: '/campaigns', label: 'Group buys' },
   { href: '/shop', label: 'Shop' },
-  { href: '/shop?category=ceramics', label: 'Ceramics' },
-  { href: '/shop?category=textiles', label: 'Textiles' },
-  { href: '/shop?category=lighting', label: 'Lighting' },
   { href: '/about', label: 'About' },
 ]
 
@@ -76,6 +73,17 @@ export function Nav() {
           <Logo />
 
           <div className="flex items-center justify-end gap-1">
+            <form action="/shop" role="search" className="relative mr-1 hidden md:block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+              <input
+                type="search"
+                name="q"
+                aria-label="Search products"
+                placeholder="Search products"
+                className="h-10 w-[150px] rounded-full border border-line-strong bg-surface pl-9 pr-3 text-[14px] text-fg placeholder:text-faint transition-[width,border-color] focus:w-[190px] focus:border-fg focus:outline-none xl:w-[200px] xl:focus:w-[240px]"
+              />
+              <button type="submit" className="sr-only">Search</button>
+            </form>
             <button
               type="button"
               aria-label={`Bag, ${cart.count} ${cart.count === 1 ? 'item' : 'items'}`}
@@ -112,7 +120,18 @@ export function Nav() {
                   <X className="size-5" />
                 </button>
               </div>
-              <ul className="mt-8 flex flex-col gap-1">
+              <form action="/shop" role="search" className="relative mt-6">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+                <input
+                  type="search"
+                  name="q"
+                  aria-label="Search products"
+                  placeholder="Search products"
+                  className="h-11 w-full rounded-control border border-line-strong bg-surface pl-9 pr-3 text-[15px] text-fg placeholder:text-faint focus:border-fg focus:outline-none"
+                />
+                <button type="submit" className="sr-only">Search</button>
+              </form>
+              <ul className="mt-6 flex flex-col gap-1">
                 {links.map((link) => (
                   <li key={link.href}>
                     <Link href={link.href} className="flex h-12 items-center rounded-control px-3 font-display text-[28px] hover:bg-surface-2">

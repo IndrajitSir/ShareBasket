@@ -1,4 +1,4 @@
-import { ArrowDownUp, ArrowRight, Clock3, MapPin, PackageCheck, UsersRound } from 'lucide-react'
+import { ArrowDownUp, ArrowRight, Clock3, MapPin, PackageCheck, Search, UsersRound } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -22,9 +22,12 @@ const categories = [
   { value: 'home', label: 'Home' },
 ]
 
-type SearchParams = Promise<{ category?: string; society?: string; sort?: string }>
+type SearchParams = Promise<{ category?: string; q?: string; society?: string; sort?: string }>
 
-function hrefWith(current: { category?: string; society?: string; sort?: string }, changes: Record<string, string | undefined>) {
+function hrefWith(
+  current: { category?: string; q?: string; society?: string; sort?: string },
+  changes: Record<string, string | undefined>,
+) {
   const params = new URLSearchParams()
   const merged = { ...current, ...changes }
   for (const [key, value] of Object.entries(merged)) if (value) params.set(key, value)
@@ -37,6 +40,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
   const category = categories.some((item) => item.value && item.value === params.category) ? params.category! : ''
   const sort = params.sort === 'progress' ? 'progress' : 'closing'
   const society = params.society?.slice(0, 120) ?? ''
+  const q = params.q?.trim().slice(0, 80) ?? ''
 
   let campaigns: Campaign[] = []
   let societies: string[] = []
@@ -44,7 +48,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
 
   try {
     const [filtered, all] = await Promise.all([
-      fetchCampaigns({ category: category || undefined, society: society || undefined, sort }),
+      fetchCampaigns({ category: category || undefined, q: q || undefined, society: society || undefined, sort }),
       fetchCampaigns(),
     ])
     campaigns = filtered
@@ -53,7 +57,12 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
     unavailable = true
   }
 
-  const current = { category: category || undefined, society: society || undefined, sort: sort === 'progress' ? 'progress' : undefined }
+  const current = {
+    category: category || undefined,
+    q: q || undefined,
+    society: society || undefined,
+    sort: sort === 'progress' ? 'progress' : undefined,
+  }
 
   return (
     <>
@@ -73,7 +82,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
 
       <Container className="py-10 sm:py-14">
         <div className="flex flex-wrap items-end justify-between gap-5">
-          <SectionTitle eyebrow="Open group orders" title={society || 'Shop the community'} />
+          <SectionTitle eyebrow="Open group orders" title={q ? `Results for “${q}”` : society || 'Shop the community'} />
           <div className="flex flex-wrap items-center gap-2" aria-label="Filter by community">
             <MapPin className="size-4 text-muted" aria-hidden />
             <Link href={hrefWith(current, { society: undefined })} className={cx('rounded-full px-3 py-1.5 text-[13px] transition-colors', !society ? 'bg-fg text-bg' : 'border border-line-strong text-muted hover:text-fg')}>
@@ -86,6 +95,26 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
             ))}
           </div>
         </div>
+
+        <form action="/campaigns" role="search" className="mt-7 flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
+          {category && <input type="hidden" name="category" value={category} />}
+          {society && <input type="hidden" name="society" value={society} />}
+          {sort === 'progress' && <input type="hidden" name="sort" value="progress" />}
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q}
+              aria-label="Search group buys"
+              placeholder="Search products or communities…"
+              className="h-12 w-full min-w-0 rounded-control border border-line-strong bg-surface pl-11 pr-4 text-[15px] text-fg placeholder:text-faint transition-colors focus:border-fg focus:outline-none"
+            />
+          </div>
+          <button type="submit" className="inline-flex h-12 shrink-0 items-center justify-center rounded-control bg-fg px-6 text-[14px] font-medium text-bg transition-colors hover:bg-[#33302b]">
+            Search
+          </button>
+        </form>
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
           <div className="flex flex-wrap gap-2" aria-label="Filter campaigns by category">
@@ -106,7 +135,8 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
           </p>
         ) : (
           <p className="mt-5 text-[13px] text-muted" aria-live="polite">
-            {campaigns.length} group {campaigns.length === 1 ? 'order' : 'orders'} {society ? `in ${society}` : 'across Bengaluru'} · Sample preview
+            {campaigns.length} group {campaigns.length === 1 ? 'order' : 'orders'}{' '}
+            {q ? `matching “${q}”` : society ? `in ${society}` : 'across Bengaluru'} · Sample preview
           </p>
         )}
 
@@ -167,9 +197,18 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Se
 
         {!unavailable && campaigns.length === 0 && (
           <div className="mt-10 rounded-card border border-line bg-surface px-6 py-14 text-center">
-            <h2 className="font-display text-[32px]">No sample group orders match those filters</h2>
-            <p className="mt-2 text-[14px] text-muted">Try a different community or category.</p>
-            <Link href="/campaigns" className="mt-5 inline-flex rounded-control bg-fg px-5 py-3 text-[14px] text-bg">Clear filters</Link>
+            <h2 className="font-display text-[32px]">
+              {q ? `No group orders match “${q}”` : 'No sample group orders match those filters'}
+            </h2>
+            <p className="mt-2 text-[14px] text-muted">
+              {q ? 'Try a shorter search or a different community.' : 'Try a different community or category.'}
+            </p>
+            <Link
+              href={q ? hrefWith(current, { q: undefined }) : '/campaigns'}
+              className="mt-5 inline-flex rounded-control bg-fg px-5 py-3 text-[14px] text-bg"
+            >
+              {q ? 'Clear search' : 'Clear filters'}
+            </Link>
           </div>
         )}
       </Container>

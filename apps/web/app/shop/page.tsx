@@ -1,9 +1,9 @@
-import { SlidersHorizontal } from 'lucide-react'
+import { Search, SlidersHorizontal } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { ProductCard } from '@/components/product-card'
-import { Container } from '@/components/ui'
+import { Button, Container } from '@/components/ui'
 import { fetchCategories, fetchProducts, type Category, type Product } from '@/lib/api'
 import { cx } from '@/lib/cx'
 
@@ -28,7 +28,7 @@ const sortOptions = [
   { key: 'price-desc', label: 'Price, high to low' },
 ]
 
-type SearchParams = Promise<{ category?: string; price?: string; sort?: string }>
+type SearchParams = Promise<{ category?: string; price?: string; q?: string; sort?: string }>
 
 function parsePrice(value: string | undefined): { min?: number; max?: number; key: string } {
   const option = priceOptions.find((item) => item.key && item.key === value)
@@ -53,6 +53,7 @@ export default async function ShopPage({ searchParams }: { searchParams: SearchP
   const price = parsePrice(params.price)
   const sort = sortOptions.some((item) => item.key === params.sort) ? (params.sort as string) : 'featured'
   const category = params.category?.slice(0, 40) ?? ''
+  const q = params.q?.trim().slice(0, 80) ?? ''
 
   let items: Product[] = []
   let categories: Category[] = []
@@ -63,6 +64,7 @@ export default async function ShopPage({ searchParams }: { searchParams: SearchP
     const [page, categoryList] = await Promise.all([
       fetchProducts({
         category: category || undefined,
+        q: q || undefined,
         sort,
         limit: 60,
         minPricePaise: price.min,
@@ -77,9 +79,16 @@ export default async function ShopPage({ searchParams }: { searchParams: SearchP
     unavailable = true
   }
 
-  const current = { category: category || undefined, price: price.key || undefined, sort: sort === 'featured' ? undefined : sort }
-  const title = categories.find((item) => item.key === category)?.label ?? 'All products'
-  const activeCount = (category ? 1 : 0) + (price.key ? 1 : 0)
+  const current = {
+    category: category || undefined,
+    price: price.key || undefined,
+    q: q || undefined,
+    sort: sort === 'featured' ? undefined : sort,
+  }
+  const title = q
+    ? `Results for “${q}”`
+    : (categories.find((item) => item.key === category)?.label ?? 'All products')
+  const activeCount = (category ? 1 : 0) + (price.key ? 1 : 0) + (q ? 1 : 0)
 
   const filters = (
     <div className="flex flex-col gap-8">
@@ -152,6 +161,24 @@ export default async function ShopPage({ searchParams }: { searchParams: SearchP
         </div>
       </div>
 
+      <form action="/shop" role="search" className="mt-6 flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
+        {category && <input type="hidden" name="category" value={category} />}
+        {price.key && <input type="hidden" name="price" value={price.key} />}
+        {sort !== 'featured' && <input type="hidden" name="sort" value={sort} />}
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            aria-label="Search products"
+            placeholder="Search rice, coffee, ceramics…"
+            className="h-12 w-full min-w-0 rounded-control border border-line-strong bg-surface pl-11 pr-4 text-[15px] text-fg placeholder:text-faint transition-colors focus:border-fg focus:outline-none"
+          />
+        </div>
+        <Button type="submit" size="sm" className="h-12">Search</Button>
+      </form>
+
       <p className="mt-3 text-[13px] text-muted">
         {activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active · ` : ''}
         {total} sample products
@@ -178,9 +205,18 @@ export default async function ShopPage({ searchParams }: { searchParams: SearchP
 
           {!unavailable && items.length === 0 && (
             <div className="py-24 text-center">
-              <p className="font-display text-[32px]">Nothing in this range yet</p>
-              <p className="mt-2 text-[14px] text-muted">Try a different category or price range.</p>
-              <Link href="/shop" className="mt-6 inline-flex rounded-control border border-line-strong px-5 py-3 text-[14px]">Clear filters</Link>
+              <p className="font-display text-[32px]">
+                {q ? `No products match “${q}”` : 'Nothing in this range yet'}
+              </p>
+              <p className="mt-2 text-[14px] text-muted">
+                {q ? 'Try a shorter search or a different category.' : 'Try a different category or price range.'}
+              </p>
+              <Link
+                href={q ? hrefWith(current, { q: undefined }) : '/shop'}
+                className="mt-6 inline-flex rounded-control border border-line-strong px-5 py-3 text-[14px]"
+              >
+                {q ? 'Clear search' : 'Clear filters'}
+              </Link>
             </div>
           )}
         </div>
