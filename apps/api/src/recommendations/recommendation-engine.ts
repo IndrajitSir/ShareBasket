@@ -34,6 +34,13 @@ export interface MembershipRow {
   societyId: string
 }
 
+/** One precomputed item-item similarity edge, symmetric in meaning. */
+export interface AffinityEdge {
+  campaignSlug: string
+  relatedSlug: string
+  score: number
+}
+
 export interface RecommendationItem {
   campaign: CandidateCampaign
   source: RecommendationSource
@@ -55,6 +62,10 @@ export interface RankingInput {
   signals: QuoteSignal[]
   now: Date
   limit?: number
+  /** Precomputed item-item similarity; falls back to scanning signals. */
+  affinities?: AffinityEdge[]
+  /** Precomputed anonymous trending order; unlisted campaigns follow by score. */
+  trendingOrder?: string[]
 }
 
 const DEFAULT_LIMIT = 6
@@ -68,12 +79,15 @@ function cityOf(location: string): string {
   return location.split('·')[0]?.trim().toLowerCase() ?? ''
 }
 
-function demandScore(campaign: CandidateCampaign): number {
+export function demandScore(campaign: Pick<CandidateCampaign, 'unitsCommitted' | 'minimumUnits'>): number {
   if (!Number.isFinite(campaign.minimumUnits) || campaign.minimumUnits < 1) return 0
   return clamp(campaign.unitsCommitted / campaign.minimumUnits)
 }
 
-function urgencyScore(campaign: CandidateCampaign, now: Date): number {
+export function urgencyScore(
+  campaign: Pick<CandidateCampaign, 'closesAt'>,
+  now: Date,
+): number {
   const days = (campaign.closesAt.getTime() - now.getTime()) / 86_400_000
   if (days <= 0) return 0
   return clamp(1 - days / MAX_DAYS_FOR_URGENCY)
@@ -123,12 +137,40 @@ function cosineSimilarity(left: Set<string>, right: Set<string>): number {
   return intersection / Math.sqrt(left.size * right.size)
 }
 
+type AffinityPairs = Map<string, Map<string, number>>
+
+function indexAffinities(edges: AffinityEdge[]): AffinityPairs {
+  const pairs: AffinityPairs = new Map()
+  for (const edge of edges) {
+    const score = Number.isFinite(edge.score) ? edge.score : 0
+    if (score <= 0) continue
+    for (const [from, to] of [
+      [edge.campaignSlug, edge.relatedSlug],
+      [edge.relatedSlug, edge.campaignSlug],
+    ]) {
+      const related = pairs.get(from) ?? new Map<string, number>()
+      related.set(to, score)
+      pairs.set(from, related)
+    }
+  }
+  return pairs
+}
+
 function affinityScore(
   campaignSlug: string,
   ownCampaignSlugs: string[],
   index: SignalIndex,
+  precomputed?: AffinityPairs,
 ): number {
   if (ownCampaignSlugs.length === 0) return 0
+
+  if (precomputed) {
+    const related = precomputed.get(campaignSlug)
+    let total = 0
+    for (const ownSlug of ownCampaignSlugs) total += related?.get(ownSlug) ?? 0
+    return total / ownCampaignSlugs.length
+  }
+
   const candidateUsers = index.usersByCampaign.get(campaignSlug)
   if (!candidateUsers) return 0
 
@@ -267,10 +309,13 @@ export function rankRecommendations(input: RankingInput): RankingResult {
     peerCountBySlug.set(slug, users.size)
   }
 
+  const precomputedAffinity = input.affinities?.length
+    ? indexAffinities(input.affinities)
+    : undefined
   const affinityBySlug = new Map(
     candidates.map((campaign) => [
       campaign.slug,
-      affinityScore(campaign.slug, ownCampaignSlugs, allIndex),
+      affinityScore(campaign.slug, ownCampaignSlugs, allIndex, precomputedAffinity),
     ]),
   )
   const maxAffinity = Math.max(0, ...Array.from(affinityBySlug.values())) || 1
@@ -321,6 +366,18 @@ export function rankRecommendations(input: RankingInput): RankingResult {
     (campaign) =>
       reasonFor(campaign, 'TRENDING', 0, demandBySlug.get(campaign.slug) ?? 0),
   )
+
+  if (input.trendingOrder?.length) {
+    const position = new Map(input.trendingOrder.map((slug, index) => [slug, index]))
+    trendingRanked.sort((left, right) => {
+      const leftPosition = position.get(left.campaign.slug)
+      const rightPosition = position.get(right.campaign.slug)
+      if (leftPosition === undefined && rightPosition === undefined) return 0
+      if (leftPosition === undefined) return 1
+      if (rightPosition === undefined) return -1
+      return leftPosition - rightPosition
+    })
+  }
 
   // A member without groups still sees what other communities are buying, but
   // no in-group section and no claim of personalisation.
