@@ -108,7 +108,7 @@ export function apiBase(): string {
   return (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
 }
 
-function serverApiBase(): string {
+export function serverApiBase(): string {
   return (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
 }
 

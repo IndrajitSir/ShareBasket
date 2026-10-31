@@ -1,11 +1,12 @@
 'use client'
 
 import { AnimatePresence, motion } from 'motion/react'
-import { Menu, Search, ShoppingBag, X } from 'lucide-react'
+import { Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import type { AuthUser } from '@/lib/auth-types'
 import { useCart } from '@/lib/cart'
 import { cx } from '@/lib/cx'
 
@@ -31,8 +32,28 @@ export function Nav() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [user, setUser] = useState<AuthUser | null>(null)
 
   useEffect(() => setOpen(false), [pathname])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/backend/auth/me', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) return null
+        const data = (await response.json()) as { user?: AuthUser }
+        return data.user ?? null
+      })
+      .then((current) => {
+        if (!cancelled) setUser(current)
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -84,6 +105,14 @@ export function Nav() {
               />
               <button type="submit" className="sr-only">Search</button>
             </form>
+            <Link
+              href={user ? '/account' : '/login'}
+              aria-label={user ? `Account, ${user.name}` : 'Sign in'}
+              className="inline-flex h-10 items-center gap-2 rounded-control px-3 text-[14px] transition-colors hover:bg-surface-2"
+            >
+              <UserRound className="size-5" aria-hidden />
+              <span className="hidden sm:inline">{user ? user.name.split(/\s+/)[0] : 'Sign in'}</span>
+            </Link>
             <button
               type="button"
               aria-label={`Bag, ${cart.count} ${cart.count === 1 ? 'item' : 'items'}`}
@@ -140,6 +169,13 @@ export function Nav() {
                   </li>
                 ))}
               </ul>
+              <Link
+                href={user ? '/account' : '/login'}
+                className="mt-4 flex h-12 items-center gap-3 rounded-control border border-line-strong px-3 text-[15px]"
+              >
+                <UserRound className="size-5" aria-hidden />
+                {user ? 'Your account' : 'Sign in'}
+              </Link>
             </motion.nav>
           </motion.div>
         )}
