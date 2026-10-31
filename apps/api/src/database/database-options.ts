@@ -9,10 +9,20 @@ import { CampaignProduct } from './entities/campaign-product.entity'
 import { Category } from './entities/category.entity'
 import { Product } from './entities/product.entity'
 import { Society } from './entities/society.entity'
+import { User } from './entities/user.entity'
 import { InitSchema1793000000000 } from './migrations/1793000000000-InitSchema'
+import { AddUsers1793000000001 } from './migrations/1793000000001-AddUsers'
 
-export const entities = [Category, Product, Society, Campaign, CampaignProduct, CampaignPriceTier]
-export const migrations = [InitSchema1793000000000]
+export const entities = [
+  Category,
+  Product,
+  Society,
+  Campaign,
+  CampaignProduct,
+  CampaignPriceTier,
+  User,
+]
+export const migrations = [InitSchema1793000000000, AddUsers1793000000001]
 
 export function buildDataSourceOptions(config: AppConfig): DataSourceOptions {
   if (config.dbDriver === 'postgres') {

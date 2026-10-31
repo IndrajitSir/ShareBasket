@@ -1,4 +1,5 @@
 import { BadRequestException, ValidationPipe, type INestApplication } from '@nestjs/common'
+import cookieParser from 'cookie-parser'
 import type { NextFunction, Request, Response } from 'express'
 import helmet from 'helmet'
 
@@ -14,11 +15,12 @@ export const API_PREFIX = 'api/v1'
 export function configureApp(app: INestApplication, options: { corsOrigins: string[] }): void {
   app.setGlobalPrefix(API_PREFIX)
   app.use(helmet({ crossOriginResourcePolicy: false }))
+  app.use(cookieParser())
 
   app.enableCors({
     origin: options.corsOrigins,
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Request-Id', 'Idempotency-Key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
     exposedHeaders: ['X-Request-Id'],
     credentials: false,
     maxAge: 600,

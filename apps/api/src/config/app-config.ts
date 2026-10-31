@@ -1,5 +1,10 @@
 export type DbDriver = 'postgres' | 'sqlite'
 
+export interface OAuthClientConfig {
+  clientId: string
+  clientSecret: string
+}
+
 export interface AppConfig {
   nodeEnv: string
   isProduction: boolean
@@ -12,6 +17,10 @@ export interface AppConfig {
   migrateOnBoot: boolean
   seedOnBoot: boolean
   seedAllowProduction: boolean
+  authSecret: string
+  publicWebUrl: string
+  google?: OAuthClientConfig
+  github?: OAuthClientConfig
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -55,12 +64,54 @@ function parseOrigins(value: string | undefined): string[] {
   })
 }
 
+const DEVELOPMENT_AUTH_SECRET = 'sharebasket-development-only-session-secret'
+
+function parseAuthSecret(value: string | undefined, isProduction: boolean): string {
+  const secret = value?.trim()
+  if (!secret) {
+    if (isProduction) throw new Error('AUTH_SECRET is required in production.')
+    return DEVELOPMENT_AUTH_SECRET
+  }
+  if (secret.length < 32) throw new Error('AUTH_SECRET must be at least 32 characters.')
+  return secret
+}
+
+function parsePublicWebUrl(value: string | undefined): string {
+  const raw = value?.trim() || 'http://localhost:3000'
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error(`PUBLIC_WEB_URL is not a valid URL: "${raw}".`)
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.pathname !== '/' || url.search || url.hash) {
+    throw new Error('PUBLIC_WEB_URL must be a bare http(s) origin, for example https://app.example.com.')
+  }
+  return url.origin
+}
+
+function parseOAuthPair(
+  clientId: string | undefined,
+  clientSecret: string | undefined,
+  label: string,
+): OAuthClientConfig | undefined {
+  const id = clientId?.trim()
+  const secret = clientSecret?.trim()
+  if (!id && !secret) return undefined
+  if (!id || !secret) {
+    throw new Error(`${label}_CLIENT_ID and ${label}_CLIENT_SECRET must be set together.`)
+  }
+  return { clientId: id, clientSecret: secret }
+}
+
 /**
  * Reads and validates process environment configuration. Throwing here keeps
- * the process from serving traffic with a half-configured database or CORS.
+ * the process from serving traffic with a half-configured database, CORS,
+ * session signing or OAuth provider.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const nodeEnv = env.NODE_ENV?.trim() || 'development'
+  const isProduction = nodeEnv === 'production'
   const dbDriver = (env.DB_DRIVER?.trim() || 'sqlite') as DbDriver
 
   if (dbDriver !== 'postgres' && dbDriver !== 'sqlite') {
@@ -77,7 +128,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   return {
     nodeEnv,
-    isProduction: nodeEnv === 'production',
+    isProduction,
     port: parsePort(env.PORT),
     dbDriver,
     databaseUrl,
@@ -87,5 +138,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     migrateOnBoot: parseBoolean(env.MIGRATE_ON_BOOT, false),
     seedOnBoot: parseBoolean(env.SEED_ON_BOOT, false),
     seedAllowProduction: parseBoolean(env.SEED_ALLOW_PRODUCTION, false),
+    authSecret: parseAuthSecret(env.AUTH_SECRET, isProduction),
+    publicWebUrl: parsePublicWebUrl(env.PUBLIC_WEB_URL),
+    google: parseOAuthPair(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, 'GOOGLE'),
+    github: parseOAuthPair(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET, 'GITHUB'),
   }
 }

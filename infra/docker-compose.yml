@@ -35,6 +35,9 @@ services:
       DATABASE_SSL: 'false'
       PORT: '4000'
       CORS_ORIGINS: http://localhost:3000
+      # Demo-only signing secret; replace before any real deployment.
+      AUTH_SECRET: compose-only-session-secret-change-before-deploy
+      PUBLIC_WEB_URL: http://localhost:3000
       # Demo automation only.
       MIGRATE_ON_BOOT: 'true'
       SEED_ON_BOOT: 'true'
