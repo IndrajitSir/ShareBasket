@@ -6,6 +6,7 @@ import { buildDataSourceOptions } from './database/database-options'
 import { AuthModule } from './auth/auth.module'
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { MembershipsModule } from './memberships/memberships.module'
+import { RecommendationsModule } from './recommendations/recommendations.module'
 import { CatalogueModule } from './catalogue/catalogue.module'
 import { HealthModule } from './health/health.module'
 
@@ -16,6 +17,7 @@ import { HealthModule } from './health/health.module'
     CatalogueModule,
     CampaignsModule,
     MembershipsModule,
+    RecommendationsModule,
     HealthModule,
   ],
 })

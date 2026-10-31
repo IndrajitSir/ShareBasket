@@ -155,6 +155,9 @@ function reasonFor(
     return `${campaign.unitsCommitted} units pledged in ${society}`
   }
   if (source === 'OTHER_GROUPS') {
+    if (peerCount > 0) {
+      return `${peerCount} ${peerCount === 1 ? 'neighbour has' : 'neighbours have'} quoted this`
+    }
     if (demand >= 1) return `Minimum met in ${society}`
     return `${campaign.unitsCommitted} units pledged in ${society}`
   }
