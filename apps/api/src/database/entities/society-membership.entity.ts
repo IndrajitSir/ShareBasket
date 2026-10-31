@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 
+import type { SocietyRole } from '../../memberships/society-role'
 import { Society } from './society.entity'
 import { User } from './user.entity'
 
@@ -35,6 +36,13 @@ export class SocietyMembership {
   /** Preview memberships are immediately ACTIVE; approval is a later slice. */
   @Column({ type: 'varchar', length: 16, default: 'ACTIVE' })
   status: 'ACTIVE'
+
+  /**
+   * Scoped to this society only. The first member becomes STEWARD so a group
+   * is never left without someone who can manage its roster.
+   */
+  @Column({ type: 'varchar', length: 16, default: 'MEMBER' })
+  role: SocietyRole
 
   @CreateDateColumn({ name: 'joined_at', type: Date })
   joinedAt: Date
