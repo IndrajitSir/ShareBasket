@@ -38,11 +38,19 @@ Recommendations are computed server-side from group demand, quote signals, item-
 
 - `GET /recommendations/for-you` — optional session. Returns `{ signedIn, personalized, needsGroup, needsLocation, groups, sections: { inYourGroups, otherGroups, trending }, model: { name, version, generatedAt } }`. Anonymous callers get `trending`; signed-in users without groups get `needsGroup: true` and `needsLocation: true`. Section items contain a campaign summary (`slug`, product, society, location, price, progress, close date), a human `reason` and a `source` (`YOUR_GROUPS`, `OTHER_GROUPS`, `TRENDING`). Top six per section, de-duplicated by product; the user's own quoted campaigns are excluded. Trending order and item-item affinity come from a precomputed snapshot cached for five minutes and invalidated on quote writes (see `RECOMMENDATIONS.md`); `model.generatedAt` is the request time, not the snapshot build time. The response shape does not change when the cache is rebuilt, expired or unavailable.
 - `POST /recommendations/nearby` with `{ "latitude": -90..90, "longitude": -180..180, "radiusKm": 1..50 }` — **requires a session**. Computes Haversine distance in memory, discards coordinates after the response and returns `{ radiusKm, groups: [{ id, name, location, distanceKm, memberCount, activeCampaigns, topCampaign }] }`. Coordinates are never persisted, logged or echoed; `distanceKm` is rounded to one decimal. Invalid ranges return `400 VALIDATION_ERROR`.
-- `GET /me/groups` — **requires a session**. Returns the caller's societies with `memberCount` and `activeCampaigns`.
-- `POST /me/groups/:societyId` — **requires a session**. Idempotently joins a preview group membership; `201 { group }` or `404 NOT_FOUND` for an unknown society.
-- `DELETE /me/groups/:societyId` — **requires a session**. Leaves the group; `204`, or `404 NOT_FOUND` when not a member.
+- `GET /me/groups` — **requires a session**. Returns the caller's societies with `memberCount`, `activeCampaigns` and the caller's scoped `role` (`MEMBER` or `STEWARD`).
+- `POST /me/groups/:societyId` — **requires a session**. Idempotently joins a preview group membership; `201 { group }` (including `role`) or `404 NOT_FOUND` for an unknown society. The first member of a society becomes its steward.
+- `DELETE /me/groups/:societyId` — **requires a session**. Leaves the group; `204`, or `404 NOT_FOUND` when not a member. A leaving steward passes the role to the earliest remaining member.
 
-Preview memberships are immediate: there is no approval queue, role grant or address verification yet. Never treat `societyId` as proof of residence.
+Preview memberships are immediate: there is no approval queue, invite, address verification or platform-wide role yet. Never treat `societyId` as proof of residence.
+
+## Society-scoped authorization (implemented)
+Roles are scoped to one society and re-derived from the membership row on every request; a role is never accepted from the client as authority. `docs/RBAC_PERMISSIONS.md` is authoritative for the model.
+
+- `GET /societies/:societyId/members` — **requires a session and membership of that society**. Returns `{ societyId, society: { id, name, location, memberCount }, viewerRole, members: [{ userId, name, role, joinedAt }] }`. Stewards are listed first, then earliest joiners. Names only: no emails, phone numbers, addresses or coordinates. `403 FORBIDDEN` for a non-member; `404 NOT_FOUND` for an unknown or malformed society id.
+- `PATCH /societies/:societyId/members/:userId` with `{ "role": "MEMBER" | "STEWARD" }` — **requires a session and the `STEWARD` role in that society**. Returns `{ member }` and is idempotent when the role already matches. `400 VALIDATION_ERROR` for an unknown role, unknown fields or a malformed member id; `403 FORBIDDEN` for a plain member, a non-member or a steward of a different society; `404 NOT_FOUND` when the target is not a member of that society; `409 CONFLICT` when a steward targets their own membership.
+
+`PATCH` is included in the API's CORS method allow-list. The web app calls these routes from server components and server actions, so the session cookie remains first-party and the browser never holds a token.
 
 ## Error codes in use
 `VALIDATION_ERROR` (400), `UNAUTHENTICATED` (401), `FORBIDDEN` (403, reserved), `NOT_FOUND` (404), `CONFLICT` (409), `CAMPAIGN_CLOSED` (409), `SERVICE_UNAVAILABLE` (503), `INTERNAL_ERROR` (500). Client-facing messages never include stack traces, SQL, tokens or driver errors.

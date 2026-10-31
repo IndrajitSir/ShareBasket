@@ -9,7 +9,7 @@ Inspect repo; choose ORM/auth/contracts; set up apps, environment validation, lo
 ## Phase 1 — Identity and community
 Auth/profile/session; scope-aware RBAC; society and membership/invite approval; audit role/membership changes. Implement in small vertical slices, each with focused authorization tests and reviewable commits. Exit: negative tests pass across two users and societies.
 
-**Status (2026-10-31):** email/password accounts, Google/GitHub OAuth wiring, login/register/account pages and the same-origin auth proxy are delivered. Preview society memberships (immediate join, no approval) and the explainable recommendations slice (`/for-you`, consented nearby groups) are delivered and tested. Real OAuth consent, rate limiting/verification and the approval-based membership workflow remain; the phase is still in progress.
+**Status (2026-11-01):** email/password accounts, Google/GitHub OAuth wiring, login/register/account pages and the same-origin auth proxy are delivered. Society membership now carries a scoped `MEMBER`/`STEWARD` role enforced by a society scope guard, with a roster at `/groups/[id]` and a steward-only role hand-off; the explainable recommendations slice (`/for-you`, consented nearby groups) is delivered and tested. Real OAuth consent, rate limiting/verification, and the approval/invite, address-verification and audit parts of membership remain; the phase is still in progress.
 
 ## Phase 2 — Supplier and catalogue
 Supplier onboarding/verification; org users; categories/products/variants/media/inventory; moderation. Add schema, service/API, UI and tests incrementally, with each meaningful verified unit committed independently. Exit: supplier isolation verified.

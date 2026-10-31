@@ -81,7 +81,7 @@ The payload is stored as one JSON row in `recommendation_snapshot` (scope `globa
 The cache is in-process with a database-backed copy, so replicas each hold their own memory copy but agree on the persisted payload; no Redis or worker process is required. Budgets are enforced by `apps/api/test/recommendation-latency.spec.ts`: a snapshot over 800 campaigns and 1,200 signals must build in under 1.5 s, ranking the full candidate set in under 750 ms, and a warm read must average under 5 ms with zero database queries.
 
 ## Membership semantics
-`GET /me/groups`, `POST /me/groups/:societyId` and `DELETE /me/groups/:societyId`. This is a **preview membership**: joining is immediate and has no approval workflow, role grant or address verification. It exists so the recommendation branches are testable; `P1-01` still owns approval, scope-aware RBAC and audit.
+`GET /me/groups`, `POST /me/groups/:societyId` and `DELETE /me/groups/:societyId`. Joining is immediate and has no approval workflow, invite or address verification. Each membership carries a role scoped to that society (`MEMBER` or `STEWARD`); the first member becomes steward and a departing steward hands the role on. Group-scoped actions are authorized by `SocietyScopeGuard`, and `/groups/[id]` shows the roster to members and role controls to stewards. See `RBAC_PERMISSIONS.md`. Recommendations use society ids only — they never read or infer a role.
 
 ## Scalability and deployment
 The MVP loads open campaigns, memberships and quote signals and scores them in memory. That is appropriate for a pilot with a handful of societies, and the snapshot cache now keeps co-occurrence and trending ordering off the request path. It does **not** yet bound the request-time signal load:
