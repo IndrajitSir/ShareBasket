@@ -34,13 +34,20 @@ source; it talks to the API over JSON described in
   bcrypt, Google/GitHub OAuth when configured, and an HttpOnly JWT session kept
   first-party through a same-origin proxy. Services are defined in
   `apps/api/src/auth`.
+- **Recommendations** at `/for-you`: in-group picks, cross-group picks and a
+  trending cold start, each with a plain-language reason. Signed-in members can
+  join a preview society and, only after pressing **Use my location**, see open
+  groups sorted by rounded distance. Model and privacy details are in
+  [`docs/RECOMMENDATIONS.md`](docs/RECOMMENDATIONS.md).
 - **Persisted sample data**: categories, products, societies, campaigns, price
-  tiers and accounts are stored with TypeORM and served by NestJS.
+  tiers, accounts, preview memberships and quote signals are stored with TypeORM
+  and served by NestJS.
 - **Health check** at `/api/v1/health` reporting database connectivity.
 
 ## What is deliberately not live
 
-There are no society memberships, roles, commitments, orders, stock reservations,
+Society membership is a preview: joining is immediate with no approval, role or
+address verification. There are no commitments, orders, stock reservations,
 payments or verified suppliers. Accounts exist, but email verification, password
 reset, MFA and login rate limiting do not. The bag and checkout are a preview:
 checkout explains that ordering is not enabled and creates no order. Nothing here
