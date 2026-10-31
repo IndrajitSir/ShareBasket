@@ -29,6 +29,22 @@ describe('loadConfig auth settings', () => {
     ).toBe(false)
   })
 
+  it('validates the signal rate limit and defaults to 30 per minute', () => {
+    expect(loadConfig(BASE).signalRateLimitPerMinute).toBe(30)
+    expect(
+      loadConfig({ ...BASE, SIGNAL_RATE_LIMIT_PER_MINUTE: '5' }).signalRateLimitPerMinute,
+    ).toBe(5)
+    expect(
+      loadConfig({ ...BASE, SIGNAL_RATE_LIMIT_PER_MINUTE: '0' }).signalRateLimitPerMinute,
+    ).toBe(0)
+    expect(() =>
+      loadConfig({ ...BASE, SIGNAL_RATE_LIMIT_PER_MINUTE: '-1' }),
+    ).toThrow('SIGNAL_RATE_LIMIT_PER_MINUTE must be an integer between 0 and 10000.')
+    expect(() =>
+      loadConfig({ ...BASE, SIGNAL_RATE_LIMIT_PER_MINUTE: '1.5' }),
+    ).toThrow('SIGNAL_RATE_LIMIT_PER_MINUTE must be an integer between 0 and 10000.')
+  })
+
   it('rejects a partial OAuth pair and a web URL with a path', () => {
     expect(() =>
       loadConfig({ ...BASE, GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: undefined }),

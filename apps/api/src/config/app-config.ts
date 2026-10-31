@@ -21,6 +21,8 @@ export interface AppConfig {
   publicWebUrl: string
   /** Defaults to production; override only for HTTP-only local demos. */
   sessionCookieSecure: boolean
+  /** Implicit quote signals accepted per member per minute; 0 disables. */
+  signalRateLimitPerMinute: number
   google?: OAuthClientConfig
   github?: OAuthClientConfig
 }
@@ -39,6 +41,15 @@ function parsePort(value: string | undefined): number {
     throw new Error('PORT must be an integer between 0 and 65535.')
   }
   return port
+}
+
+function parseSignalRateLimit(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return 30
+  const limit = Number(value.trim())
+  if (!Number.isInteger(limit) || limit < 0 || limit > 10_000) {
+    throw new Error('SIGNAL_RATE_LIMIT_PER_MINUTE must be an integer between 0 and 10000.')
+  }
+  return limit
 }
 
 function parseOrigins(value: string | undefined): string[] {
@@ -143,6 +154,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     authSecret: parseAuthSecret(env.AUTH_SECRET, isProduction),
     publicWebUrl: parsePublicWebUrl(env.PUBLIC_WEB_URL),
     sessionCookieSecure: parseBoolean(env.SESSION_COOKIE_SECURE, isProduction),
+    signalRateLimitPerMinute: parseSignalRateLimit(env.SIGNAL_RATE_LIMIT_PER_MINUTE),
     google: parseOAuthPair(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, 'GOOGLE'),
     github: parseOAuthPair(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET, 'GITHUB'),
   }

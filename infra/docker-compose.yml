@@ -40,6 +40,7 @@ services:
       PUBLIC_WEB_URL: http://localhost:3000
       # Compose serves plain HTTP locally; do not use this in a real deployment.
       SESSION_COOKIE_SECURE: 'false'
+      SIGNAL_RATE_LIMIT_PER_MINUTE: '30'
       # Demo automation only.
       MIGRATE_ON_BOOT: 'true'
       SEED_ON_BOOT: 'true'

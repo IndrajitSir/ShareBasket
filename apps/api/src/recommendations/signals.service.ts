@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 
 import { CampaignSignal } from '../database/entities/campaign-signal.entity'
 import { Campaign } from '../database/entities/campaign.entity'
+import { SIGNAL_RATE_LIMITER, SlidingWindowRateLimiter } from './signal-rate-limit'
 
 @Injectable()
 export class SignalsService {
@@ -13,6 +14,7 @@ export class SignalsService {
     @InjectRepository(CampaignSignal)
     private readonly signals: Repository<CampaignSignal>,
     @InjectRepository(Campaign) private readonly campaigns: Repository<Campaign>,
+    @Inject(SIGNAL_RATE_LIMITER) private readonly limiter: SlidingWindowRateLimiter,
   ) {}
 
   /**
@@ -25,6 +27,11 @@ export class SignalsService {
   async recordQuote(userId: string, campaignSlug: string, quantity: number): Promise<boolean> {
     const campaign = await this.campaigns.findOne({ where: { slug: campaignSlug } })
     if (!campaign) return false
+
+    if (!this.limiter.take(userId)) {
+      this.logger.debug('Quote signal skipped: member rate limit exceeded.')
+      return false
+    }
 
     const weight = Number.isFinite(quantity) ? Math.max(1, Math.min(20, Math.floor(quantity))) : 1
     await this.signals.upsert(

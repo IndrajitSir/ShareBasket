@@ -34,6 +34,9 @@ services:
         sync: false
       - key: AUTH_SECRET
         generateValue: true
+      # Implicit quote signals accepted per member per minute (0 disables).
+      - key: SIGNAL_RATE_LIMIT_PER_MINUTE
+        value: '30'
       # Optional OAuth: set both values of a provider in the Render dashboard.
       - key: GOOGLE_CLIENT_ID
         sync: false
