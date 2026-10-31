@@ -19,6 +19,14 @@ describe('loadConfig auth settings', () => {
     expect(() =>
       loadConfig({ ...BASE, NODE_ENV: 'production', AUTH_SECRET: 'too-short' }),
     ).toThrow('AUTH_SECRET must be at least 32 characters.')
+
+    expect(
+      loadConfig({ ...BASE, NODE_ENV: 'production' }).sessionCookieSecure,
+    ).toBe(true)
+    expect(
+      loadConfig({ ...BASE, NODE_ENV: 'production', SESSION_COOKIE_SECURE: 'false' })
+        .sessionCookieSecure,
+    ).toBe(false)
   })
 
   it('rejects a partial OAuth pair and a web URL with a path', () => {

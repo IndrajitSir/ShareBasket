@@ -48,7 +48,7 @@ export class AuthController {
   @HttpCode(201)
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) response: Response) {
     const session = await this.auth.register(dto)
-    response.cookie(SESSION_COOKIE, session.token, sessionCookieOptions(this.config.isProduction))
+    response.cookie(SESSION_COOKIE, session.token, sessionCookieOptions(this.config.sessionCookieSecure))
     return { user: session.user }
   }
 
@@ -56,14 +56,14 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: Response) {
     const session = await this.auth.login(dto)
-    response.cookie(SESSION_COOKIE, session.token, sessionCookieOptions(this.config.isProduction))
+    response.cookie(SESSION_COOKIE, session.token, sessionCookieOptions(this.config.sessionCookieSecure))
     return { user: session.user }
   }
 
   @Post('logout')
   @HttpCode(204)
   logout(@Res({ passthrough: true }) response: Response): void {
-    response.clearCookie(SESSION_COOKIE, clearedCookieOptions(this.config.isProduction))
+    response.clearCookie(SESSION_COOKIE, clearedCookieOptions(this.config.sessionCookieSecure))
   }
 
   @Get('me')
@@ -119,7 +119,7 @@ export class AuthController {
     response.cookie(
       OAUTH_STATE_COOKIE,
       `${provider}:${state}`,
-      oauthStateCookieOptions(this.config.isProduction),
+      oauthStateCookieOptions(this.config.sessionCookieSecure),
     )
     response.redirect(this.oauth.authorizeUrl(provider, state))
   }
@@ -133,7 +133,7 @@ export class AuthController {
     response: Response,
   ): Promise<void> {
     const cookie = request.cookies?.[OAUTH_STATE_COOKIE]
-    response.clearCookie(OAUTH_STATE_COOKIE, clearedCookieOptions(this.config.isProduction))
+    response.clearCookie(OAUTH_STATE_COOKIE, clearedCookieOptions(this.config.sessionCookieSecure))
 
     if (error || !code) {
       this.redirectFailure(response, 'oauth_cancelled')
@@ -151,7 +151,7 @@ export class AuthController {
       response.cookie(
         SESSION_COOKIE,
         session.token,
-        sessionCookieOptions(this.config.isProduction),
+        sessionCookieOptions(this.config.sessionCookieSecure),
       )
       response.redirect(`${this.config.publicWebUrl}/account?welcome=1`)
     } catch (caught) {

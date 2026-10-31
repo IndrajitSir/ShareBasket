@@ -19,6 +19,8 @@ export interface AppConfig {
   seedAllowProduction: boolean
   authSecret: string
   publicWebUrl: string
+  /** Defaults to production; override only for HTTP-only local demos. */
+  sessionCookieSecure: boolean
   google?: OAuthClientConfig
   github?: OAuthClientConfig
 }
@@ -140,6 +142,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     seedAllowProduction: parseBoolean(env.SEED_ALLOW_PRODUCTION, false),
     authSecret: parseAuthSecret(env.AUTH_SECRET, isProduction),
     publicWebUrl: parsePublicWebUrl(env.PUBLIC_WEB_URL),
+    sessionCookieSecure: parseBoolean(env.SESSION_COOKIE_SECURE, isProduction),
     google: parseOAuthPair(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, 'GOOGLE'),
     github: parseOAuthPair(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET, 'GITHUB'),
   }
