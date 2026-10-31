@@ -22,22 +22,29 @@ source; it talks to the API over JSON described in
 
 ## What works today
 
-- **Campaign discovery** at `/campaigns`: filter by community and category, sort
-  by closing date or progress, current tier price per campaign.
+- **Campaign discovery** at `/campaigns`: filter by community and category,
+  search campaigns, sort by closing date or progress, current tier price per
+  campaign.
 - **Campaign detail** at `/campaigns/[slug]`: all tiers, current tier, progress
   against the group minimum, deadline, delivery date, and a quantity calculator
   that asks the API to price the line server-side.
-- **Catalogue** at `/shop` and `/product/[slug]`, backed by the API.
-- **Persisted sample data**: categories, products, societies, campaigns and
-  price tiers are stored with TypeORM and served by NestJS.
+- **Catalogue** at `/shop` and `/product/[slug]`, backed by the API, with a
+  search bar in the header and on listing pages.
+- **Accounts** at `/login`, `/register` and `/account`: email/password with
+  bcrypt, Google/GitHub OAuth when configured, and an HttpOnly JWT session kept
+  first-party through a same-origin proxy. Services are defined in
+  `apps/api/src/auth`.
+- **Persisted sample data**: categories, products, societies, campaigns, price
+  tiers and accounts are stored with TypeORM and served by NestJS.
 - **Health check** at `/api/v1/health` reporting database connectivity.
 
 ## What is deliberately not live
 
-There are no accounts, sessions, roles, commitments, orders, stock reservations,
-payments or verified suppliers. The bag and checkout are a preview: checkout
-explains that ordering is not enabled and creates no order. Nothing here should
-be presented as a real offer, real saving, or real order.
+There are no society memberships, roles, commitments, orders, stock reservations,
+payments or verified suppliers. Accounts exist, but email verification, password
+reset, MFA and login rate limiting do not. The bag and checkout are a preview:
+checkout explains that ordering is not enabled and creates no order. Nothing here
+should be presented as a real offer, real saving, or real order.
 
 ## Run it locally
 
@@ -64,6 +71,13 @@ To exercise the PostgreSQL target locally, use
 `docker compose -f infra/docker-compose.yml up db` and set
 `DB_DRIVER=postgres` plus `DATABASE_URL` in `apps/api/.env`.
 
+OAuth is optional. Set `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and/or
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` in `apps/api/.env`, with
+`PUBLIC_WEB_URL=http://localhost:3000`. The callback URLs are
+`http://localhost:3000/api/backend/auth/google/callback` and
+`.../github/callback`. Without keys, only email/password sign-in is shown.
+Production requires a 32+ character `AUTH_SECRET`.
+
 ## Verification commands
 
 ```bash
@@ -77,8 +91,9 @@ npm run build            # API compile and Next.js production build
 - **Frontend** → Vercel, root directory `apps/web`, with `API_URL` and
   `NEXT_PUBLIC_API_URL` pointing at the API.
 - **Backend** → Render Web Service built from `infra/api.Dockerfile`, with a
-  managed PostgreSQL `DATABASE_URL` and `CORS_ORIGINS` set to the web origin.
-  [`render.yaml`](render.yaml) provisions the API and database as a Blueprint.
+  managed PostgreSQL `DATABASE_URL`, `AUTH_SECRET`, `PUBLIC_WEB_URL` and
+  `CORS_ORIGINS` set for the web origin. [`render.yaml`](render.yaml) provisions
+  the API and database as a Blueprint; add OAuth keys in the Render dashboard.
 - **Containers** → `docker compose -f infra/docker-compose.yml up --build`.
 
 `docker compose -f infra/docker-compose.yml config` is verified. The images were

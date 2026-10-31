@@ -13,6 +13,8 @@ Supplier: verification, organisation users, products/variants/inventory, offers/
 Operations: users/societies/suppliers, moderation, campaigns, orders/payments/refunds, disputes, audit, roles/settings.
 
 ## UX patterns
+Search is available in the header and on the shop/campaign listings, with the query kept in the URL and preserved across filters and sort. Auth pages keep a single-column form, label every field, show inline errors, offer email/password as the always-available path and reveal OAuth buttons only when the server has that provider configured. Signed-in state should be visible in the header without flashing a false identity.
+
 Campaign cards show product/unit, current tier price, progress, deadline, delivery estimate and CTA. Progress includes text, not colour alone. Price breakdown lists unit price, discount, quantity, tax, service/delivery fees and total. Forms need labels, help, validation and errors. Tables need server-side pagination/filtering and mobile alternatives. Provide loading, empty, success, error, not-found, unauthenticated and forbidden states.
 
 ## Responsive/accessibility
