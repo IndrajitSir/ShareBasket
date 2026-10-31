@@ -5,6 +5,7 @@ import { loadConfig } from './config/app-config'
 import { buildDataSourceOptions } from './database/database-options'
 import { AuthModule } from './auth/auth.module'
 import { CampaignsModule } from './campaigns/campaigns.module'
+import { MembershipsModule } from './memberships/memberships.module'
 import { CatalogueModule } from './catalogue/catalogue.module'
 import { HealthModule } from './health/health.module'
 
@@ -14,6 +15,7 @@ import { HealthModule } from './health/health.module'
     AuthModule,
     CatalogueModule,
     CampaignsModule,
+    MembershipsModule,
     HealthModule,
   ],
 })
