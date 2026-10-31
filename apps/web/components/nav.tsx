@@ -11,6 +11,7 @@ import { useCart } from '@/lib/cart'
 import { cx } from '@/lib/cx'
 
 const links = [
+  { href: '/for-you', label: 'For you' },
   { href: '/campaigns', label: 'Group buys' },
   { href: '/shop', label: 'Shop' },
   { href: '/about', label: 'About' },
