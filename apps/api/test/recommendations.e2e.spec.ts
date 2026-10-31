@@ -9,6 +9,7 @@ import { AuthModule } from '../src/auth/auth.module'
 import { CampaignsModule } from '../src/campaigns/campaigns.module'
 import { entities, migrations } from '../src/database/database-options'
 import { CampaignSignal } from '../src/database/entities/campaign-signal.entity'
+import { Campaign } from '../src/database/entities/campaign.entity'
 import { Society } from '../src/database/entities/society.entity'
 import { seedDatabase } from '../src/database/seed-runner'
 import { MembershipsModule } from '../src/memberships/memberships.module'
@@ -21,6 +22,7 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
   let app: INestApplication
   let dataSource: DataSource
   let signals: Repository<CampaignSignal>
+  let campaigns: Repository<Campaign>
   let mapleId: string
   let lakeviewId: string
   let server: ReturnType<INestApplication['getHttpServer']>
@@ -55,6 +57,7 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
     dataSource = app.get(DataSource)
     await seedDatabase(dataSource)
     signals = dataSource.getRepository(CampaignSignal)
+    campaigns = dataSource.getRepository(Campaign)
 
     const societies = await dataSource.getRepository(Society).find()
     mapleId = societies.find((society) => society.name === MAPLE)!.id
@@ -167,6 +170,44 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
       reason: '1 neighbour has quoted this',
     })
     expect(peers.society.id).toBe(lakeviewId)
+  })
+
+  it('collapses repeated quotes from the same member into one signal', async () => {
+    const response = await request(server)
+      .post('/api/v1/auth/register')
+      .send({
+        email: 'recommend-dedupe@example.com',
+        password: 'correct-horse',
+        name: 'Dedupe Test',
+      })
+      .expect(201)
+    const userId = response.body.user.id as string
+    const agent = request.agent(server)
+    await agent
+      .post('/api/v1/auth/login')
+      .send({ email: 'recommend-dedupe@example.com', password: 'correct-horse' })
+      .expect(200)
+
+    const campaign = await campaigns.findOneOrFail({ where: { slug: 'household-lentils' } })
+    const waitForWeight = async (expected: number) => {
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        const row = await signals.findOne({
+          where: { userId, campaignId: campaign.id },
+        })
+        if (row?.weight === expected) return
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      throw new Error(`Expected the quote signal weight to become ${expected}.`)
+    }
+
+    await agent.post('/api/v1/campaigns/household-lentils/quote').send({ quantity: 2 }).expect(200)
+    await waitForWeight(2)
+
+    await agent.post('/api/v1/campaigns/household-lentils/quote').send({ quantity: 5 }).expect(200)
+    await waitForWeight(5)
+
+    const rows = await signals.find({ where: { userId, campaignId: campaign.id } })
+    expect(rows).toHaveLength(1)
   })
 
   it('requires a session and consent-shaped coordinates for nearby search', async () => {

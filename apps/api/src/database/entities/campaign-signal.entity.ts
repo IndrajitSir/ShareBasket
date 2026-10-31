@@ -15,7 +15,7 @@ export type CampaignSignalType = 'QUOTE'
 
 /** Implicit interest only: a quote is not a commitment or purchase. */
 @Entity('user_campaign_signal_detail')
-@Index('ix_signal_user', ['userId'])
+@Index('uq_signal_user_campaign', ['userId', 'campaignId'], { unique: true })
 @Index('ix_signal_campaign', ['campaignId'])
 export class CampaignSignal {
   @PrimaryGeneratedColumn('uuid')

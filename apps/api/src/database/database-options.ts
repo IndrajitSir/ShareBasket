@@ -15,6 +15,7 @@ import { User } from './entities/user.entity'
 import { InitSchema1793000000000 } from './migrations/1793000000000-InitSchema'
 import { AddUsers1793000000001 } from './migrations/1793000000001-AddUsers'
 import { AddRecommendations1793000000002 } from './migrations/1793000000002-AddRecommendations'
+import { DedupeQuoteSignals1793000000003 } from './migrations/1793000000003-DedupeQuoteSignals'
 
 export const entities = [
   Category,
@@ -31,6 +32,7 @@ export const migrations = [
   InitSchema1793000000000,
   AddUsers1793000000001,
   AddRecommendations1793000000002,
+  DedupeQuoteSignals1793000000003,
 ]
 
 export function buildDataSourceOptions(config: AppConfig): DataSourceOptions {

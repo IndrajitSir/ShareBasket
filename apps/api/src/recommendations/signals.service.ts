@@ -18,18 +18,25 @@ export class SignalsService {
   /**
    * Best-effort implicit interest. A quote is not a commitment or a purchase,
    * and a signal write must never fail the quote request.
+   *
+   * One row exists per member and campaign, so repeated quotes update the
+   * weight rather than adding duplicate evidence.
    */
-  async recordQuote(userId: string, campaignSlug: string, quantity: number): Promise<void> {
+  async recordQuote(userId: string, campaignSlug: string, quantity: number): Promise<boolean> {
     const campaign = await this.campaigns.findOne({ where: { slug: campaignSlug } })
-    if (!campaign) return
+    if (!campaign) return false
 
     const weight = Number.isFinite(quantity) ? Math.max(1, Math.min(20, Math.floor(quantity))) : 1
-    await this.signals.insert({
-      userId,
-      campaignId: campaign.id,
-      signalType: 'QUOTE',
-      weight,
-    })
+    await this.signals.upsert(
+      {
+        userId,
+        campaignId: campaign.id,
+        signalType: 'QUOTE',
+        weight,
+      },
+      { conflictPaths: ['userId', 'campaignId'] },
+    )
+    return true
   }
 
   logRecordFailure(campaignSlug: string, error: unknown): void {
