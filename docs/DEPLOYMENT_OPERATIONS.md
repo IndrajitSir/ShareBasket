@@ -35,12 +35,24 @@ API (`apps/api/.env.example`):
 - `SQLITE_PATH` (default `./data/sharebasket.sqlite`) when `DB_DRIVER=sqlite`.
 - `CORS_ORIGINS` = comma-separated browser origins, e.g. `http://localhost:3000,https://your-app.vercel.app`. Wildcards are not supported and must not be combined with credentials.
 - `SEED_ON_BOOT=true` for a demo environment only; production data must be seeded intentionally with `npm run seed -w apps/api`.
+- `AUTH_SECRET` — at least 32 random characters used to sign session JWTs. **Required in production**; the API refuses to start without it. Generate with `openssl rand -base64 48` and store it only in the hosting dashboard.
+- `PUBLIC_WEB_URL` — the browser origin of the web app, e.g. `http://localhost:3000` or `https://your-app.vercel.app`. Used for OAuth redirect URIs and post-login redirects. No trailing path.
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — optional pair; both must be set or both omitted.
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — optional pair; both must be set or both omitted.
 
 Web (`apps/web/.env.example`):
 - `API_URL` = server-side base URL of the API, e.g. `http://api:4000/api/v1` in compose or `https://your-api.onrender.com/api/v1`.
 - `NEXT_PUBLIC_API_URL` = browser-visible API base URL with the same value in cloud deployments. Only non-secret values belong in `NEXT_PUBLIC_*`.
 
 Secrets are set in the hosting dashboards (Vercel env vars, Render env vars). Never commit `.env`, `.env.local`, or real credentials.
+
+## OAuth application setup
+Create the apps only after the deployed web URL is known, because the redirect URI must match exactly:
+
+- Google (Google Cloud Console → APIs & Services → Credentials → OAuth client ID → Web application): authorised redirect URI `https://<web-origin>/api/backend/auth/google/callback` (locally `http://localhost:3000/api/backend/auth/google/callback`).
+- GitHub (Settings → Developer settings → OAuth Apps): authorization callback URL `https://<web-origin>/api/backend/auth/github/callback`.
+
+Put the client ID/secret pairs in the **API** service environment, set `PUBLIC_WEB_URL` to the web origin, and redeploy the API. The login page hides a provider when its pair is absent; credentials login works without OAuth. Vercel previews have unique hostnames and therefore need their own OAuth apps/callbacks or a fixed preview domain before OAuth can be tested there.
 
 ## Local setup
 1. `npm install` at the repository root.

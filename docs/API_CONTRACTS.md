@@ -12,16 +12,29 @@ Implemented under `/api/v1` by `apps/api`. All responses are JSON, every respons
 
 - `GET /health` — liveness plus database connectivity. Returns `{ status, database, latencyMs, uptimeSeconds }` (`latencyMs` only when the probe succeeds); `503` with `status: "degraded"` when the database is unreachable.
 - `GET /categories` — `{ categories: [{ key, label, blurb, image, productCount }] }`.
-- `GET /products?category=&limit=&offset=` — paginated `{ items, page: { limit, offset, total } }`; `limit` 1–60, default 24. Unknown category returns an empty page, malformed values return `400 VALIDATION_ERROR`.
+- `GET /products?category=&q=&limit=&offset=` — paginated `{ items, page: { limit, offset, total } }`; `limit` 1–60, default 24. `q` is a trimmed, case-insensitive search over product name, short description and description (maximum 80 characters). Unknown category returns an empty page, malformed values return `400 VALIDATION_ERROR`.
 - `GET /products/:slug` — `{ product }` or `404 NOT_FOUND`.
-- `GET /campaigns?category=&society=&sort=closing|progress` — `{ campaigns, previewOnly: true }`, each campaign including its product summary, society, location, `unitsCommitted`, `minimumUnits`, `closesAt` (ISO-8601), `deliveryDate` (ISO date), `tiers` (ordered), `currentUnitPricePaise`, `currentUnitPrice`, and `progress` (`percent`, `minimumMet`, `unitsRemaining`, `nextTier`).
+- `GET /campaigns?category=&society=&q=&sort=closing|progress` — `{ campaigns, previewOnly: true }`, each campaign including its product summary, society, location, `unitsCommitted`, `minimumUnits`, `closesAt` (ISO-8601), `deliveryDate` (ISO date), `tiers` (ordered), `currentUnitPricePaise`, `currentUnitPrice`, and `progress` (`percent`, `minimumMet`, `unitsRemaining`, `nextTier`). `q` matches product name/description, society name or location (maximum 80 characters).
 - `GET /campaigns/:slug` — `{ campaign, previewOnly: true }` or `404 NOT_FOUND`.
 - `POST /campaigns/:slug/quote` with `{ "quantity": 1..20 }` — prices the whole line at the tier its units would reach, including already-committed units. Returns `quote` (paise amounts plus formatted `unitPrice`, `lineTotal`, `currentUnitPrice`) and `previewOnly: true`. `400 VALIDATION_ERROR` for an invalid body or quantity, `404 NOT_FOUND` for an unknown campaign, `409 CAMPAIGN_CLOSED` for a closed campaign.
 
-Campaign and product data is seeded sample data. These endpoints are not authenticated and expose no write path; quote requests create no commitment and reserve no stock. Do not add commitment, order, inventory or payment writes until authentication, scope-aware authorization, idempotency, transactions and the human-approved business rules exist. Swagger UI is served at `/api/docs` in non-production environments.
+Campaign and product data is seeded sample data. These endpoints expose no write path; quote requests create no commitment and reserve no stock. Do not add commitment, order, inventory or payment writes until scope-aware authorization, idempotency, transactions and the human-approved business rules exist. Swagger UI is served at `/api/docs` in non-production environments.
+
+## Authentication (implemented)
+Authentication lives in the NestJS API. The browser never receives a bearer token: the API sets an **HttpOnly, `SameSite=Lax` cookie** named `sb_session` (JWT, 7-day expiry, `Secure` when `NODE_ENV=production`). The Next.js app exposes only the same-origin proxy `/api/backend/auth/*`, so the cookie stays first-party on the Vercel origin and cannot be read by client JavaScript. Server components may call the API directly with the forwarded cookie. The API also accepts `Authorization: Bearer <token>` for trusted server clients.
+
+- `POST /auth/register` with `{ email, password, name }` — creates an account and sets the session cookie. `201 { user }`; `409 CONFLICT` for an existing email; `400 VALIDATION_ERROR` for an invalid email, a password shorter than 8 or longer than 72 characters, or a name outside 2–80 characters. Passwords are hashed with bcrypt; the hash is never returned.
+- `POST /auth/login` with `{ email, password }` — `200 { user }` and sets the cookie; `401 UNAUTHENTICATED` with a generic message for unknown email or wrong password.
+- `POST /auth/logout` — `204`, clears the cookie. The JWT remains valid until expiry if it was captured elsewhere; revocation is not implemented.
+- `GET /auth/me` — `200 { user }` for a valid cookie or bearer token, otherwise `401 UNAUTHENTICATED`.
+- `GET /auth/providers` — `{ google: boolean, github: boolean }` based on server configuration, used to hide unusable OAuth buttons.
+- `GET /auth/google` and `GET /auth/github` — start the Authorization Code flow. `302` to the provider, with a short-lived HttpOnly `sb_oauth_state` cookie. `503 SERVICE_UNAVAILABLE` when that provider's client ID/secret are not configured.
+- `GET /auth/google/callback` and `GET /auth/github/callback` — validate `state` against the cookie, exchange the code server-side, require a verified provider email, upsert the user by `(provider, subject)` or link an existing unlinked email, set the session cookie, and `302` to `${PUBLIC_WEB_URL}/account?welcome=1`. Failures redirect to `/login?error=oauth` without exposing provider or token details; a mismatched/missing `state` is rejected.
+
+Public user shape: `{ id, email, name, avatarUrl, provider, createdAt }` where `provider` is `local`, `google` or `github`. Email/password sign-in remains available after an OAuth link. OAuth is optional per provider. Not implemented: email verification, password reset, MFA, login rate limiting and multiple OAuth identities per account; an email already linked to a different provider is rejected with `409 CONFLICT` rather than silently merged.
 
 ## Error codes in use
-`VALIDATION_ERROR` (400), `UNAUTHENTICATED` (401, reserved), `FORBIDDEN` (403, reserved), `NOT_FOUND` (404), `CAMPAIGN_CLOSED` (409), `INTERNAL_ERROR` (500). Client-facing messages never include stack traces, SQL or driver errors.
+`VALIDATION_ERROR` (400), `UNAUTHENTICATED` (401), `FORBIDDEN` (403, reserved), `NOT_FOUND` (404), `CONFLICT` (409), `CAMPAIGN_CLOSED` (409), `SERVICE_UNAVAILABLE` (503), `INTERNAL_ERROR` (500). Client-facing messages never include stack traces, SQL, tokens or driver errors.
 
 ## Examples
 `GET /campaigns?city=&category=&cursor=`; `GET /campaigns/:id`; `POST /campaigns/:id/quote`; `POST /orders` with `Idempotency-Key`; `GET /me/orders`; `GET /orders/:id`; `POST /orders/:id/cancellation-requests`; `POST /payments/:id/refund-requests`; `POST /webhooks/payments/:provider`.

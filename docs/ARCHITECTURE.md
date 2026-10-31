@@ -17,7 +17,21 @@ docs          product, architecture, data, security and workflow documentation
 - Each app owns its own `package.json`, `tsconfig.json`, `.env.example` and Dockerfile stage. Root scripts only orchestrate them.
 
 ## Current implementation state
-The workspace currently contains a read-only catalogue and campaign preview API plus the storefront that consumes it. There is no authentication, order, payment, inventory or commitment write path yet; those modules must be added as separate vertical slices with authorization, transactions and idempotency before any real buyer or supplier data is stored.
+The workspace contains a read-only catalogue and campaign preview API, email/password accounts with Google and GitHub OAuth, and the storefront that consumes them. There is no order, payment, inventory or commitment write path yet; those modules must be added as separate vertical slices with authorization, transactions and idempotency before any real buyer or supplier data is stored.
+
+## Authentication and session flow
+The NestJS API is the identity authority. Email/password credentials are hashed with bcrypt and OAuth Authorization Code flows run server-side; provider tokens and the session JWT never reach client JavaScript.
+
+```
+Browser → Next.js /api/backend/auth/* (same-origin proxy) → NestJS /api/v1/auth/*
+                                                              ├── bcrypt credentials
+                                                              ├── Google / GitHub token exchange
+                                                              └── HttpOnly sb_session cookie
+```
+
+The proxy exists because Vercel and Render are different sites in the free deployment: a cookie set directly by the Render API would be third-party and blocked by many browsers. The proxy forwards the request body, `cookie`, `content-type` and safe response headers, including `Set-Cookie`; the browser stores `sb_session` as a first-party cookie on the web origin. The OAuth redirect URI is therefore `${PUBLIC_WEB_URL}/api/backend/auth/{provider}/callback`, not an API URL. The API redirects back to `${PUBLIC_WEB_URL}/account` after a successful exchange.
+
+OAuth `state` is a random value stored in a short-lived HttpOnly `sb_oauth_state` cookie and compared on callback. Sessions are stateless JWTs with a 7-day lifetime, so logout clears the cookie but does not revoke a copied token; rate limiting, verification and revocation are tracked in `TODO.md`. All future protected API operations must check authorization on the server even though the UI hides controls.
 
 ## Stack
 Next.js App Router + TypeScript; NestJS + TypeScript REST API at `/api/v1`; PostgreSQL; one ORM; Redis/BullMQ when background workloads justify it; S3-compatible object storage for media/private files; payment provider adapter; structured logs, metrics, traces and error tracking.

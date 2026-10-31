@@ -39,5 +39,13 @@ Initial market India/INR; pilot starts with a small number of societies in one c
 - **Trade-offs:** No authentication, orders, payments, inventory or commitment writes yet. The cart and checkout remain a clearly labelled preview with no order API. The old Hono Worker, Vite SPA, Cloudflare deploy manifest and their tests were removed rather than left as a second implementation.
 - **Revisit trigger:** Before any buyer/supplier data or write endpoint — add identity, scope-aware authorization, idempotency and transaction tests. Validate the API against a real PostgreSQL instance (Docker/Render/Neon) before declaring deployment ready.
 
+### 2026-10-31 — Self-hosted identity with a same-origin auth proxy
+- **Context:** The storefront had no login pages, the product needs accounts before memberships or writes, and OAuth was requested. The free deployment splits the app across Vercel and Render, so a session cookie set directly by the Render API is third-party and blocked by several browsers. A managed auth search returned no suitable service for this stack.
+- **Options:** (a) Auth.js in Next.js with a second identity store, (b) managed auth (Clerk/Supabase), (c) email/password + OAuth in NestJS behind a same-origin Next.js proxy.
+- **Chosen:** (c). NestJS owns `user_master`, bcrypt credentials and Google/GitHub Authorization Code exchange; Next.js exposes only `/api/backend/auth/*`, forwards cookies/redirects, and renders login/register/account pages. `sb_session` is an HttpOnly JWT cookie on the web origin; OAuth `state` uses a short-lived HttpOnly cookie and a fixed `PUBLIC_WEB_URL` redirect.
+- **Trade-offs:** No email verification, password reset, MFA, login throttling, revocation or multi-provider linking yet. OAuth cannot be exercised end-to-end without human-created provider apps. The API accepts bearer sessions for trusted server clients but browser auth always goes through the proxy.
+- **Docs updated:** `API_CONTRACTS.md`, `DATA_MODEL.md`, `ARCHITECTURE.md`, `SECURITY_VULNERABILITY.md`, `DEPLOYMENT_OPERATIONS.md`, `TODO.md`.
+- **Revisit trigger:** Before exposing any write endpoint or real buyer data: add rate limiting and verification (`P1-02`), then membership-scoped authorization and negative tests (`P1-01`).
+
 ## Decision log template
 Date; decision; context; options; chosen option/rationale; trade-offs; docs/code/tests updated; revisit trigger. Convert assumptions to decisions explicitly; never present an assumption as fact.
