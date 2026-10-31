@@ -10,6 +10,13 @@ Development and automated tests may use SQLite (`DB_DRIVER=sqlite`) so the API c
 ### Identity (implemented)
 `user_master`: `id` (UUID), unique normalised `email`, `name`, nullable `password_hash` (bcrypt, never selected by default), nullable `avatar_url`, nullable `oauth_provider` (`google` | `github`), nullable `oauth_subject`, `created_at`, `updated_at`. A unique `(oauth_provider, oauth_subject)` index prevents duplicate provider identities. Local accounts have a password hash and `oauth_provider = 'local'`; linking an OAuth identity to a local account keeps the password hash. Email uniqueness is the account key, so a second OAuth provider cannot be attached to the same email yet. Session JWTs are stateless and are **not** stored in the database; logout only clears the cookie. A future `refresh_session_detail`/identity table is required before token revocation or multi-provider linking.
 
+### Recommendations and groups (implemented)
+- `society_master` gains nullable `latitude`/`longitude` (`float` for driver portability). Sample societies are seeded with synthetic Bengaluru coordinates; real coordinates must be verified. Raw coordinates are used only for server-side distance and are not returned by the nearby endpoint.
+- `society_membership_detail`: `id`, `user_id`, `society_id`, `status` (`ACTIVE`), `joined_at`; unique `(user_id, society_id)`, cascade on user, restrict on society. This is an immediate preview membership — no approval, role or verification fields yet.
+- `user_campaign_signal_detail`: `id`, `user_id`, `campaign_id`, `signal_type` (`QUOTE`), `weight` (quantity, 1–20), `created_at`; indexes on user and campaign, cascade on both. Signals are implicit interest, not purchases. Repeated quotes are allowed and intentionally overweight interest until deduplication/rate limiting exists.
+
+Recommendation responses are computed at request time from these tables; there is no model blob or raw location column on users.
+
 ## Mandatory master/detail convention
 Master tables hold relatively stable identity, catalogue, reference or configuration data. Detail/transaction tables hold line items, activity, movements, events and history. Examples: `product_master` → `product_variant_master`; `order_master` → `order_detail` + `order_status_history`; `payment_master` → `payment_transaction_detail` + `refund_detail`; `society_master` → `society_membership_detail`; `campaign_master` → `campaign_product_master`, `campaign_price_tier_detail`, `campaign_commitment_detail`; `delivery_master` → `delivery_item_detail` + status history. Use conventional names where clearer; document exceptions. Do not force naming mechanically.
 

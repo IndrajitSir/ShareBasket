@@ -27,6 +27,30 @@ docker compose -f infra/docker-compose.yml up --build
 - Vercel preview deployments use unique hostnames. Browser requests from each preview origin must be added to `CORS_ORIGINS`, or routed through a same-origin proxy, before browser-side quote calls work.
 - `NEXT_PUBLIC_API_URL` is baked into the browser bundle at build time; changing the API origin requires a rebuild/redeploy of the web app.
 
+## Deployment options
+All three targets run the **same two images** and the same NestJS recommendation code; there is no model server to provision.
+
+| Target | Web | API | Database | Notes |
+| --- | --- | --- | --- | --- |
+| Vercel + Render | Vercel (`apps/web`) | Render Docker (`infra/api.Dockerfile`) | Render PostgreSQL or Neon | Free-tier path; current blueprint. |
+| AWS | Vercel/Amplify, or the web image on ECS/App Runner | ECS Fargate or App Runner from `infra/api.Dockerfile` | RDS PostgreSQL | Migrations as a one-off ECS task/App Runner job; set secrets via Secrets Manager. |
+| Virtual machine | `web` compose service behind Nginx/Caddy TLS | `api` compose service | `db` compose service with a named volume | Simplest single-host path; back up the volume and restrict the database port. |
+
+For AWS and a VM, set the same environment contract below plus `PUBLIC_WEB_URL` to the public HTTPS web origin and `CORS_ORIGINS` to the same origin. Run `npm run migration:run -w apps/api` once per release before starting new API tasks. Both images are stateless except for the database, so horizontal API replicas are safe.
+
+Browser geolocation only works on `https://` origins or `localhost`. A plain-HTTP VM deployment must terminate TLS (Caddy/Nginx/ALB) or the nearby-groups button will be blocked by the browser.
+
+For a VM:
+
+```bash
+# .env values are read by compose; set AUTH_SECRET, PUBLIC_WEB_URL and CORS_ORIGINS first.
+docker compose -f infra/docker-compose.yml up --build -d
+# One-off schema + sample data (demo); production should run migrations only.
+docker compose -f infra/docker-compose.yml exec api npm run migration:run
+```
+
+The recommendation engine needs no extra dependency beyond PostgreSQL; society coordinates live in `society_master`. If recommendation load grows, add a scheduled precompute job rather than a separate ML cluster.
+
 ## Environment contract
 API (`apps/api/.env.example`):
 - `PORT` (default 4000), `NODE_ENV`.

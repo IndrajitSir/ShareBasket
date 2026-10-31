@@ -16,7 +16,7 @@ Implemented under `/api/v1` by `apps/api`. All responses are JSON, every respons
 - `GET /products/:slug` — `{ product }` or `404 NOT_FOUND`.
 - `GET /campaigns?category=&society=&q=&sort=closing|progress` — `{ campaigns, previewOnly: true }`, each campaign including its product summary, society, location, `unitsCommitted`, `minimumUnits`, `closesAt` (ISO-8601), `deliveryDate` (ISO date), `tiers` (ordered), `currentUnitPricePaise`, `currentUnitPrice`, and `progress` (`percent`, `minimumMet`, `unitsRemaining`, `nextTier`). `q` matches product name/description, society name or location (maximum 80 characters).
 - `GET /campaigns/:slug` — `{ campaign, previewOnly: true }` or `404 NOT_FOUND`.
-- `POST /campaigns/:slug/quote` with `{ "quantity": 1..20 }` — prices the whole line at the tier its units would reach, including already-committed units. Returns `quote` (paise amounts plus formatted `unitPrice`, `lineTotal`, `currentUnitPrice`) and `previewOnly: true`. `400 VALIDATION_ERROR` for an invalid body or quantity, `404 NOT_FOUND` for an unknown campaign, `409 CAMPAIGN_CLOSED` for a closed campaign.
+- `POST /campaigns/:slug/quote` with `{ "quantity": 1..20 }` — prices the whole line at the tier its units would reach, including already-committed units. Returns `quote` (paise amounts plus formatted `unitPrice`, `lineTotal`, `currentUnitPrice`) and `previewOnly: true`. `400 VALIDATION_ERROR` for an invalid body or quantity, `404 NOT_FOUND` for an unknown campaign, `409 CAMPAIGN_CLOSED` for a closed campaign. When the request carries a valid session, the API also records a best-effort `QUOTE` interest signal used by recommendations; failure to record it never fails the quote.
 
 Campaign and product data is seeded sample data. These endpoints expose no write path; quote requests create no commitment and reserve no stock. Do not add commitment, order, inventory or payment writes until scope-aware authorization, idempotency, transactions and the human-approved business rules exist. Swagger UI is served at `/api/docs` in non-production environments.
 
@@ -32,6 +32,17 @@ Authentication lives in the NestJS API. The browser never receives a bearer toke
 - `GET /auth/google/callback` and `GET /auth/github/callback` — validate `state` against the cookie, exchange the code server-side, require a verified provider email, upsert the user by `(provider, subject)` or link an existing unlinked email, set the session cookie, and `302` to `${PUBLIC_WEB_URL}/account?welcome=1`. Failures redirect to `/login?error=oauth` without exposing provider or token details; a mismatched/missing `state` is rejected.
 
 Public user shape: `{ id, email, name, avatarUrl, provider, createdAt }` where `provider` is `local`, `google` or `github`. Email/password sign-in remains available after an OAuth link. OAuth is optional per provider. Not implemented: email verification, password reset, MFA, login rate limiting and multiple OAuth identities per account; an email already linked to a different provider is rejected with `409 CONFLICT` rather than silently merged.
+
+## Recommendations and groups (implemented)
+Recommendations are computed server-side from group demand, quote signals, item-item collaborative filtering and, for nearby groups, consented coordinates. Model details and limitations are in `RECOMMENDATIONS.md`; no purchase history is claimed.
+
+- `GET /recommendations` — optional session. Returns `{ signedIn, personalized, needsGroup, needsLocation, groups, sections: { inYourGroups, otherGroups, trending }, model: { name, version, generatedAt } }`. Anonymous callers get `trending`; signed-in users without groups get `needsGroup: true` and `needsLocation: true`. Section items contain a campaign summary (`slug`, product, society, location, price, progress, close date), a human `reason` and a `source` (`YOUR_GROUPS`, `OTHER_GROUPS`, `TRENDING`). Top six per section, de-duplicated by product; the user's own quoted campaigns are excluded.
+- `POST /recommendations/nearby` with `{ "latitude": -90..90, "longitude": -180..180, "radiusKm": 1..50 }` — **requires a session**. Computes Haversine distance in memory, discards coordinates after the response and returns `{ radiusKm, groups: [{ id, name, location, distanceKm, memberCount, activeCampaigns, topCampaign }] }`. Coordinates are never persisted, logged or echoed; `distanceKm` is rounded to one decimal. Invalid ranges return `400 VALIDATION_ERROR`.
+- `GET /me/groups` — **requires a session**. Returns the caller's societies with `memberCount` and `activeCampaigns`.
+- `POST /me/groups/:societyId` — **requires a session**. Idempotently joins a preview group membership; `201 { group }` or `404 NOT_FOUND` for an unknown society.
+- `DELETE /me/groups/:societyId` — **requires a session**. Leaves the group; `204`, or `404 NOT_FOUND` when not a member.
+
+Preview memberships are immediate: there is no approval queue, role grant or address verification yet. Never treat `societyId` as proof of residence.
 
 ## Error codes in use
 `VALIDATION_ERROR` (400), `UNAUTHENTICATED` (401), `FORBIDDEN` (403, reserved), `NOT_FOUND` (404), `CONFLICT` (409), `CAMPAIGN_CLOSED` (409), `SERVICE_UNAVAILABLE` (503), `INTERNAL_ERROR` (500). Client-facing messages never include stack traces, SQL, tokens or driver errors.

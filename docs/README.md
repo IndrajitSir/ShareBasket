@@ -6,6 +6,7 @@ This folder is the product source of truth for human and AI contributors. Read a
 - `DESIGN.md`: UX, navigation, visual system and accessibility.
 - `DATA_MODEL.md`: master/detail database model and integrity rules.
 - `ARCHITECTURE.md`: Next.js/NestJS architecture and scaling.
+- `RECOMMENDATIONS.md`: hybrid recommendation model, proximity/privacy rules and scaling.
 - `API_CONTRACTS.md`: endpoint conventions and API rules.
 - `RBAC_PERMISSIONS.md`: role- and scope-based authorization.
 - `BUSINESS_RULES.md`: campaigns, pricing, orders, inventory, payments.

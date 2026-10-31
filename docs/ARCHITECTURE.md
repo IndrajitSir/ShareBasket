@@ -33,6 +33,9 @@ The proxy exists because Vercel and Render are different sites in the free deplo
 
 OAuth `state` is a random value stored in a short-lived HttpOnly `sb_oauth_state` cookie and compared on callback. Sessions are stateless JWTs with a 7-day lifetime, so logout clears the cookie but does not revoke a copied token; rate limiting, verification and revocation are tracked in `TODO.md`. All future protected API operations must check authorization on the server even though the UI hides controls.
 
+## Recommendations
+A dedicated `recommendations` module scores campaigns in-process using a pure engine (`recommendation-engine.ts`) over TypeORM reads: society memberships, quote signals, campaign demand and society coordinates. `POST /recommendations/nearby` performs Haversine distance from browser-consented coordinates and never persists them. There is no separate ML service, model server or GPU; the same API container runs on Render, AWS (ECS/App Runner) and a VM. See `RECOMMENDATIONS.md` for the algorithm, privacy rules and the precomputation path at scale.
+
 ## Stack
 Next.js App Router + TypeScript; NestJS + TypeScript REST API at `/api/v1`; PostgreSQL; one ORM; Redis/BullMQ when background workloads justify it; S3-compatible object storage for media/private files; payment provider adapter; structured logs, metrics, traces and error tracking.
 

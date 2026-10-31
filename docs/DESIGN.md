@@ -17,6 +17,9 @@ Search is available in the header and on the shop/campaign listings, with the qu
 
 Campaign cards show product/unit, current tier price, progress, deadline, delivery estimate and CTA. Progress includes text, not colour alone. Price breakdown lists unit price, discount, quantity, tax, service/delivery fees and total. Forms need labels, help, validation and errors. Tables need server-side pagination/filtering and mobile alternatives. Provide loading, empty, success, error, not-found, unauthenticated and forbidden states.
 
+## Discover / recommendations
+A `/discover` page presents “From your groups”, “Other groups are buying” and “Trending now” as campaign cards with a plain-language reason, never fake match percentages. Users without a group see a nearby-groups prompt; location is requested only after a **Use my location** click, with a visible privacy note and denied/error states. Joining is a clear action followed by refreshed recommendations. Signed-out visitors see a sign-in path plus public trending, not an empty page.
+
 ## Responsive/accessibility
 Mobile-first buyer flow; persistent sidebar for desktop operations portals, compact mobile navigation. Keyboard support, visible focus, semantic headings/landmarks, accessible errors/dialog focus, sufficient contrast, meaningful alt text, touch-friendly targets and reduced-motion support. Aim for WCAG 2.2 AA. No scroll hijacking or long intro animations.
 

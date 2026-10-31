@@ -47,5 +47,13 @@ Initial market India/INR; pilot starts with a small number of societies in one c
 - **Docs updated:** `API_CONTRACTS.md`, `DATA_MODEL.md`, `ARCHITECTURE.md`, `SECURITY_VULNERABILITY.md`, `DEPLOYMENT_OPERATIONS.md`, `TODO.md`.
 - **Revisit trigger:** Before exposing any write endpoint or real buyer data: add rate limiting and verification (`P1-02`), then membership-scoped authorization and negative tests (`P1-01`).
 
+### 2026-10-31 — Hybrid in-process recommender instead of a separate ML service
+- **Context:** The product has no orders or purchase history, so a trained model would be fabricated. The user wants peer/group recommendations, nearby-group discovery with location permission, and painless deployment on Vercel/Render, AWS and a VM.
+- **Options:** (a) add Python/scikit-learn or a vector database, (b) call a hosted recommendation API, (c) implement an explainable hybrid in NestJS over PostgreSQL.
+- **Chosen:** (c). Signals are society membership, quote interest, campaign demand and consented coordinates; scoring combines peer demand, item-item cosine collaborative filtering, urgency and proximity. Membership and coordinates are persisted; raw user coordinates are never stored. No extra runtime or infra is required.
+- **Trade-offs:** Recommendations are only as good as quote signals; sample `unitsCommitted` is synthetic. No training pipeline, embeddings, fairness evaluation or A/B testing yet. Cold start leans on popularity/geo. Signal spam is possible until rate limiting/deduplication lands.
+- **Docs/tests updated:** `RECOMMENDATIONS.md`, `API_CONTRACTS.md`, `DATA_MODEL.md`, `ARCHITECTURE.md`, `SECURITY_VULNERABILITY.md`, `DEPLOYMENT_OPERATIONS.md`, `DESIGN.md`, `PRODUCT.md`, `TODO.md`.
+- **Revisit trigger:** When real commitment/order volume exists, or scoring latency exceeds the pilot budget: precompute co-occurrence/trending and evaluate offline precision before adding any model service.
+
 ## Decision log template
 Date; decision; context; options; chosen option/rationale; trade-offs; docs/code/tests updated; revisit trigger. Convert assumptions to decisions explicitly; never present an assumption as fact.
