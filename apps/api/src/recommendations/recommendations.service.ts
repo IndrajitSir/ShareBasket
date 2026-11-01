@@ -86,7 +86,7 @@ export class RecommendationsService {
     const [groups, candidates, memberships, signals, snapshot] = await Promise.all([
       user ? this.membershipsService.listForUser(user.id) : Promise.resolve([]),
       this.loadCandidates(now),
-      this.memberships.find({ select: { userId: true, societyId: true } }),
+      this.memberships.find({ where: { status: 'ACTIVE' }, select: { userId: true, societyId: true } }),
       this.loadSignals(),
       // A cache failure must not take the whole page down: ranking falls back
       // to scanning the signals it already loaded.
@@ -100,9 +100,14 @@ export class RecommendationsService {
       }),
     ])
 
+    // A pending request is not membership. It is shown in `groups` so the UI can
+    // explain the wait, but it never unlocks a group's campaigns or counts as a
+    // society for collaborative filtering.
+    const activeGroups = groups.filter((group) => group.status === 'ACTIVE')
+
     const ranked = rankRecommendations({
       userId: user?.id ?? null,
-      userSocietyIds: groups.map((group) => group.id),
+      userSocietyIds: activeGroups.map((group) => group.id),
       candidates,
       memberships,
       signals,
@@ -111,10 +116,10 @@ export class RecommendationsService {
       trendingOrder: snapshot?.trending,
     })
 
-    const needsGroup = Boolean(user) && groups.length === 0
+    const needsGroup = Boolean(user) && activeGroups.length === 0
     return {
       signedIn: Boolean(user),
-      personalized: Boolean(user) && groups.length > 0,
+      personalized: Boolean(user) && activeGroups.length > 0,
       needsGroup,
       needsLocation: needsGroup,
       groups,
@@ -145,8 +150,11 @@ export class RecommendationsService {
         .createQueryBuilder('membership')
         .select('membership.society_id', 'societyId')
         .addSelect('COUNT(*)', 'count')
+        .where('membership.status = :status', { status: 'ACTIVE' })
         .groupBy('membership.society_id')
         .getRawMany<{ societyId: string; count: string }>(),
+      // Pending requests are included so the nearby list does not invite the
+      // same account to ask again; member counts above stay active-only.
       this.memberships.find({ where: { userId }, select: { societyId: true } }),
     ])
     const joined = new Set(joinedRows.map((row) => row.societyId))

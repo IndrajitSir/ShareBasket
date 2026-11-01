@@ -24,6 +24,7 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
   let signals: Repository<CampaignSignal>
   let campaigns: Repository<Campaign>
   let mapleId: string
+  let mapleSteward: ReturnType<typeof request.agent>
   let lakeviewId: string
   let server: ReturnType<INestApplication['getHttpServer']>
 
@@ -120,6 +121,7 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
   it('personalises different sections after joining a group', async () => {
     const agent = await register('recommend-member@example.com')
     await agent.post(`/api/v1/me/groups/${mapleId}`).expect(201)
+    mapleSteward = agent
 
     const response = await agent.get('/api/v1/recommendations/for-you').expect(200)
 
@@ -147,12 +149,45 @@ describe('Recommendations API (SQLite, migrated schema)', () => {
     ).toBe(true)
   })
 
+  it('keeps a pending request out of personal recommendations until it is approved', async () => {
+    const agent = await register('recommend-pending@example.com')
+    const joined = await agent.post(`/api/v1/me/groups/${mapleId}`).expect(201)
+    expect(joined.body.group.status).toBe('PENDING')
+
+    const pending = await agent.get('/api/v1/recommendations/for-you').expect(200)
+    expect(pending.body.personalized).toBe(false)
+    expect(pending.body.needsGroup).toBe(true)
+    expect(pending.body.groups).toEqual([
+      expect.objectContaining({ id: mapleId, status: 'PENDING' }),
+    ])
+    expect(pending.body.sections.inYourGroups).toEqual([])
+
+    const agentId = (await agent.get('/api/v1/auth/me').expect(200)).body.user.id as string
+    await mapleSteward
+      .post(`/api/v1/societies/${mapleId}/requests/${agentId}/approve`)
+      .expect(200)
+
+    const approved = await agent.get('/api/v1/recommendations/for-you').expect(200)
+    expect(approved.body.personalized).toBe(true)
+    expect(approved.body.needsGroup).toBe(false)
+    expect(approved.body.groups[0]).toMatchObject({ id: mapleId, status: 'ACTIVE' })
+    expect(approved.body.sections.inYourGroups.length).toBeGreaterThan(0)
+  })
+
   it('records quotes as implicit signals and explains peer-driven suggestions', async () => {
     const viewer = await register('recommend-viewer@example.com')
+    const viewerId = (await viewer.get('/api/v1/auth/me').expect(200)).body.user.id as string
     await viewer.post(`/api/v1/me/groups/${mapleId}`).expect(201)
+    await mapleSteward
+      .post(`/api/v1/societies/${mapleId}/requests/${viewerId}/approve`)
+      .expect(200)
 
     const peer = await register('recommend-peer@example.com')
+    const peerId = (await peer.get('/api/v1/auth/me').expect(200)).body.user.id as string
     await peer.post(`/api/v1/me/groups/${mapleId}`).expect(201)
+    await mapleSteward
+      .post(`/api/v1/societies/${mapleId}/requests/${peerId}/approve`)
+      .expect(200)
     await peer
       .post('/api/v1/campaigns/filter-coffee/quote')
       .send({ quantity: 3 })
