@@ -21,6 +21,7 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
   let memberId: string
   let stewardId: string
   let outsider: ReturnType<typeof request.agent>
+  let requester: ReturnType<typeof request.agent>
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test'
@@ -64,6 +65,15 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
     stewardId = stewardMe.body.user.id as string
     const memberMe = await plainMember.get('/api/v1/auth/me').expect(200)
     memberId = memberMe.body.user.id as string
+
+    // Approval is what turns the request into membership, so the scope tests
+    // below run against a genuinely active member.
+    await steward
+      .post(`/api/v1/societies/${mapleId}/requests/${memberId}/approve`)
+      .expect(200)
+
+    requester = await register('scope-requester@example.com', 'Pending Requester')
+    await requester.post(`/api/v1/me/groups/${mapleId}`).expect(201)
   })
 
   afterAll(async () => {
@@ -122,6 +132,21 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
     expect(JSON.stringify(response.body)).not.toContain('scope-steward@example.com')
     expect(JSON.stringify(response.body)).not.toContain('scope-member@example.com')
     expect(response.body.members[0]).not.toHaveProperty('email')
+  })
+
+  it('treats a pending request as no membership at all', async () => {
+    const denied = await requester.get(`/api/v1/societies/${mapleId}/members`).expect(403)
+    expect(denied.body.message).toContain('not a member')
+
+    // A pending account cannot use the steward queue either, even to read it.
+    await requester.get(`/api/v1/societies/${mapleId}/requests`).expect(403)
+
+    // Nor can it be given a role before approval.
+    const requesterId = (await requester.get('/api/v1/auth/me').expect(200)).body.user.id as string
+    await steward
+      .patch(`/api/v1/societies/${mapleId}/members/${requesterId}`)
+      .send({ role: 'STEWARD' })
+      .expect(404)
   })
 
   it('blocks a plain member from granting themselves or others a role', async () => {

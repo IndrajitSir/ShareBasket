@@ -24,6 +24,15 @@ export class MembershipsController {
     return { groups: await this.memberships.listForUser(user.id) }
   }
 
+  /** The caller's own membership, including a still-pending request. */
+  @Get('groups/:societyId')
+  async get(
+    @CurrentUser() user: PublicUser,
+    @Param('societyId', new ParseUUIDPipe()) societyId: string,
+  ) {
+    return { group: await this.memberships.membershipSummary(user.id, societyId) }
+  }
+
   @Post('groups/:societyId')
   @HttpCode(201)
   async join(
