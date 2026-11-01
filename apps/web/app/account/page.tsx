@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { LogoutButton } from '@/components/auth-forms'
 import { ButtonLink, Container } from '@/components/ui'
+import { VerificationStatusBadge } from '@/components/verification-status'
 import { getCurrentUser } from '@/lib/auth'
 import { formatClosingDate } from '@/lib/format'
 import { fetchMyGroups } from '@/lib/groups'
@@ -93,6 +94,16 @@ function GroupCard({ group }: { group: GroupSummary }) {
           {group.pendingRequests} {group.pendingRequests === 1 ? 'request' : 'requests'} waiting for
           you
         </p>
+      )}
+
+      {!pending && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <VerificationStatusBadge status={group.verificationStatus} />
+          {(group.verificationStatus === 'UNVERIFIED' ||
+            group.verificationStatus === 'REJECTED') && (
+            <span className="text-[12px] text-faint">Add your address inside the group</span>
+          )}
+        </div>
       )}
 
       <Link
@@ -244,7 +255,7 @@ export default async function AccountPage({
             <ul className="mt-5 flex flex-col gap-4 text-[14px] leading-relaxed text-muted">
               <li className="flex gap-3">
                 <MapPin className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-                Address and tenancy verification for each group.
+                Disputes when two accounts claim the same unit, reviewed by another steward.
               </li>
               <li className="flex gap-3">
                 <ShoppingBasket className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />

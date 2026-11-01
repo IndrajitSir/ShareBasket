@@ -1,4 +1,4 @@
-import { ArrowRight, Hourglass, ShieldCheck, UsersRound } from 'lucide-react'
+import { ArrowRight, Hourglass, MapPin, ShieldCheck, UsersRound } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
@@ -7,11 +7,20 @@ import { AuditTimeline } from '@/components/audit-timeline'
 import { CancelRequestButton } from '@/components/cancel-request-button'
 import { JoinRequestControls } from '@/components/join-request-controls'
 import { MemberRoleControls } from '@/components/member-role-controls'
+import { ResidenceClaimForm } from '@/components/residence-claim-form'
+import { ResidenceReviewControls } from '@/components/residence-review-controls'
 import { ButtonLink, Container } from '@/components/ui'
+import { VerificationStatusBadge } from '@/components/verification-status'
 import { getCurrentUser } from '@/lib/auth'
 import { formatClosingDate } from '@/lib/format'
 import { fetchGroupMembership, fetchGroupRoster } from '@/lib/groups'
-import type { GroupSummary, SocietyRole } from '@/lib/recommendation-types'
+import type { GroupSummary, SocietyRole, TenancyType } from '@/lib/recommendation-types'
+
+const TENANCY_LABEL: Record<TenancyType, string> = {
+  OWNER: 'Owner',
+  TENANT: 'Tenant',
+  FAMILY: 'Family home',
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -209,6 +218,14 @@ export default async function GroupRosterPage({ params }: { params: Promise<{ id
         {isSteward && <Stat label="Requests waiting" value={waiting} highlight />}
       </dl>
 
+      <div className="mt-10 max-w-3xl">
+        <ResidenceClaimForm
+          societyId={roster.societyId}
+          claim={roster.viewerVerification}
+          societyName={roster.society.name}
+        />
+      </div>
+
       {isSteward && (
         <section aria-labelledby="requests-heading" className="mt-12 max-w-3xl">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -259,6 +276,80 @@ export default async function GroupRosterPage({ params }: { params: Promise<{ id
         </section>
       )}
 
+      {isSteward && (
+        <section aria-labelledby="residence-queue-heading" className="mt-12 max-w-3xl">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="residence-queue-heading" className="font-display text-[30px] leading-none">
+                Residence claims
+              </h2>
+              <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted">
+                Neighbours who declared a block, unit and tenure. Verifying confirms the address
+                within this group only; it is not an identity check. You cannot review your own
+                claim — another steward has to do that.
+              </p>
+            </div>
+            <span className="rounded-full border border-line-strong px-3 py-1 text-[12px] tabular-nums text-muted">
+              {roster.verificationQueue.length} waiting
+            </span>
+          </div>
+
+          {roster.verificationQueue.length === 0 ? (
+            <p className="mt-4 rounded-[18px] border border-dashed border-line-strong px-4 py-6 text-[13px] text-muted">
+              No claims waiting. Members can add their address from this page.
+            </p>
+          ) : (
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {roster.verificationQueue.map((request) => {
+                const ownClaim = viewer?.id === request.userId
+                return (
+                  <li
+                    key={request.userId}
+                    className="rounded-[18px] border border-line bg-surface p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-medium">
+                          {request.name}
+                          {ownClaim && <span className="ml-2 text-[12px] text-faint">you</span>}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1.5 text-[13px] text-fg">
+                          <MapPin className="size-3.5 shrink-0 text-muted" aria-hidden />
+                          <span className="truncate">
+                            {request.block ? `${request.block}, ` : ''}
+                            {request.unit}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] text-muted">
+                          {TENANCY_LABEL[request.tenancy]} · claimed{' '}
+                          {formatClosingDate(request.submittedAt, 'long')}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-[11.5px] text-accent">
+                        Pending
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      {ownClaim ? (
+                        <p className="text-[12.5px] leading-relaxed text-muted">
+                          Another steward must confirm your own claim before it can be verified.
+                        </p>
+                      ) : (
+                        <ResidenceReviewControls
+                          societyId={roster.societyId}
+                          userId={request.userId}
+                          name={request.name}
+                        />
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+      )}
+
       <section aria-labelledby="members-heading" className="mt-12 max-w-3xl">
         <div className="flex items-end justify-between gap-3">
           <h2 id="members-heading" className="font-display text-[30px] leading-none">
@@ -290,8 +381,9 @@ export default async function GroupRosterPage({ params }: { params: Promise<{ id
                       {isViewer && <span className="text-[12px] text-faint">you</span>}
                       <RoleBadge role={member.role} />
                     </p>
-                    <p className="mt-0.5 text-[12.5px] text-muted">
-                      Joined {formatClosingDate(member.joinedAt, 'long')}
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
+                      <span>Joined {formatClosingDate(member.joinedAt, 'long')}</span>
+                      <VerificationStatusBadge status={member.verificationStatus} />
                     </p>
                   </div>
                 </div>

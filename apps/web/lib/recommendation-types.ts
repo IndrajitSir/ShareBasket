@@ -28,6 +28,11 @@ export type SocietyRole = 'MEMBER' | 'STEWARD'
 /** A request grants no access until a steward approves it. */
 export type MembershipStatus = 'PENDING' | 'ACTIVE'
 
+/** Residence verification, independent of membership approval. */
+export type MembershipVerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED'
+
+export type TenancyType = 'OWNER' | 'TENANT' | 'FAMILY'
+
 export interface GroupSummary {
   id: string
   name: string
@@ -40,6 +45,7 @@ export interface GroupSummary {
   pendingRequests: number
   /** When a pending request was made; null once active. */
   requestedAt: string | null
+  verificationStatus: MembershipVerificationStatus
 }
 
 export interface Recommendations {

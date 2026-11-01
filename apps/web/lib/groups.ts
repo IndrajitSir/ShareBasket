@@ -1,12 +1,40 @@
 import { serverApiBase } from './api'
-import type { GroupSummary, MembershipStatus, SocietyRole } from './recommendation-types'
+import type {
+  GroupSummary,
+  MembershipStatus,
+  MembershipVerificationStatus,
+  SocietyRole,
+  TenancyType,
+} from './recommendation-types'
 import { sessionCookie } from './recommendations'
 
 export interface GroupMember {
   userId: string
   name: string
   role: SocietyRole
+  verified: boolean
+  verificationStatus: MembershipVerificationStatus
   joinedAt: string
+}
+
+/** The caller's own claim. Unit details are never shown for other members. */
+export interface ResidenceClaim {
+  status: MembershipVerificationStatus
+  block: string | null
+  unit: string | null
+  tenancy: TenancyType | null
+  submittedAt: string | null
+  decidedAt: string | null
+}
+
+/** A pending claim as a steward reviews it. */
+export interface VerificationRequest {
+  userId: string
+  name: string
+  block: string | null
+  unit: string
+  tenancy: TenancyType
+  submittedAt: string
 }
 
 export interface GroupRequest {
@@ -23,6 +51,9 @@ export type AuditAction =
   | 'ROLE_CHANGED'
   | 'STEWARD_BOOTSTRAPPED'
   | 'STEWARD_SUCCEEDED'
+  | 'RESIDENCE_CLAIMED'
+  | 'RESIDENCE_VERIFIED'
+  | 'RESIDENCE_REJECTED'
 
 export interface AuditEntry {
   id: string
@@ -41,8 +72,11 @@ export interface GroupRoster {
   society: { id: string; name: string; location: string; memberCount: number }
   viewerRole: SocietyRole
   members: GroupMember[]
+  viewerVerification: ResidenceClaim
   /** Steward-only; empty for plain members. */
   pendingRequests: GroupRequest[]
+  /** Steward-only; empty for plain members. */
+  verificationQueue: VerificationRequest[]
   /** Steward-only; empty for plain members. */
   auditTrail: AuditEntry[]
 }
@@ -236,6 +270,78 @@ export async function decideGroupRequest(
 
   if (!response.ok) {
     return { ok: false, message: await errorMessage(response, 'That decision was not allowed.') }
+  }
+
+  return { ok: true }
+}
+
+/** A member declares their residence for steward review. */
+export async function submitGroupResidence(
+  societyId: string,
+  input: { block?: string; unit: string; tenancy: TenancyType },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!UUID.test(societyId)) return { ok: false, message: 'That group is not valid.' }
+
+  const session = await sessionCookie()
+  if (!session) return { ok: false, message: 'Sign in to verify your residence.' }
+
+  let response: Response
+  try {
+    response = await fetch(
+      `${serverApiBase()}/societies/${encodeURIComponent(societyId)}/verification`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: `sb_session=${session}` },
+        body: JSON.stringify({ ...input, attested: true }),
+        cache: 'no-store',
+      },
+    )
+  } catch {
+    return { ok: false, message: 'The group service is unavailable.' }
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: await errorMessage(response, 'Your residence claim could not be submitted.'),
+    }
+  }
+
+  return { ok: true }
+}
+
+/** Steward-only decision on a residence claim. */
+export async function decideGroupResidence(
+  societyId: string,
+  userId: string,
+  decision: 'verify' | 'reject',
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!UUID.test(societyId) || !UUID.test(userId)) {
+    return { ok: false, message: 'That residence claim could not be found.' }
+  }
+
+  const session = await sessionCookie()
+  if (!session) return { ok: false, message: 'Sign in to review residence claims.' }
+
+  let response: Response
+  try {
+    response = await fetch(
+      `${serverApiBase()}/societies/${encodeURIComponent(societyId)}/verification/${encodeURIComponent(userId)}/${decision}`,
+      {
+        method: 'POST',
+        headers: { cookie: `sb_session=${session}` },
+        cache: 'no-store',
+      },
+    )
+  } catch {
+    return { ok: false, message: 'The group service is unavailable.' }
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: await errorMessage(response, 'That decision was not allowed.'),
+    }
   }
 
   return { ok: true }

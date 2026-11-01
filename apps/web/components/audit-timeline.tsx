@@ -23,6 +23,12 @@ function sentence(entry: AuditEntry): string {
       return `${entry.targetName} started this group as its steward.`
     case 'STEWARD_SUCCEEDED':
       return `${entry.targetName} became steward when the previous one left.`
+    case 'RESIDENCE_CLAIMED':
+      return `${entry.targetName} submitted a residence claim for review.`
+    case 'RESIDENCE_VERIFIED':
+      return `${actor(entry)} verified ${entry.targetName}'s residence.`
+    case 'RESIDENCE_REJECTED':
+      return `${actor(entry)} could not confirm ${entry.targetName}'s residence.`
     default:
       return `${entry.targetName}: ${entry.action}`
   }
@@ -36,6 +42,9 @@ const DOT_TONE: Record<AuditEntry['action'], string> = {
   ROLE_CHANGED: 'bg-fg',
   STEWARD_BOOTSTRAPPED: 'bg-[#4d6c51]',
   STEWARD_SUCCEEDED: 'bg-[#4d6c51]',
+  RESIDENCE_CLAIMED: 'bg-line-strong',
+  RESIDENCE_VERIFIED: 'bg-[#4d6c51]',
+  RESIDENCE_REJECTED: 'bg-accent',
 }
 
 /**
