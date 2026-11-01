@@ -22,6 +22,7 @@ import { AddRecommendationSnapshot1793000000004 } from './migrations/17930000000
 import { AddMembershipRoles1793000000005 } from './migrations/1793000000005-AddMembershipRoles'
 import { AddMembershipApproval1793000000006 } from './migrations/1793000000006-AddMembershipApproval'
 import { AddResidenceVerification1793000000007 } from './migrations/1793000000007-AddResidenceVerification'
+import { AddAccountSecurity1793000000008 } from './migrations/1793000000008-AddAccountSecurity'
 
 export const entities = [
   Category,
@@ -45,6 +46,7 @@ export const migrations = [
   AddMembershipRoles1793000000005,
   AddMembershipApproval1793000000006,
   AddResidenceVerification1793000000007,
+  AddAccountSecurity1793000000008,
 ]
 
 export function buildDataSourceOptions(config: AppConfig): DataSourceOptions {

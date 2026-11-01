@@ -42,6 +42,37 @@ export class User {
   @Column({ name: 'oauth_subject', type: 'varchar', length: 191, nullable: true })
   oauthSubject: string | null
 
+  /**
+   * Null until the account confirms an address. Local accounts created through
+   * the register endpoint start unverified; OAuth identities from providers
+   * that guarantee a verified address are marked verified at creation.
+   */
+  @Column({ name: 'email_verified_at', type: Date, nullable: true })
+  emailVerifiedAt: Date | null
+
+  /**
+   * Base32 TOTP secret for optional MFA. Null means second-factor is off. A
+   * staged (unconfirmed) secret does not gate login.
+   */
+  @Column({ name: 'mfa_secret', type: 'varchar', length: 64, nullable: true, select: false })
+  mfaSecret: string | null
+
+  /** False while enrollment is staged; set at confirm time. */
+  @Column({ name: 'mfa_confirmed', type: 'boolean', default: false, select: false })
+  mfaConfirmed: boolean
+
+  /** Set when the most recent TOTP code is accepted; codes do not repeat. */
+  @Column({ name: 'mfa_last_used_at', type: Date, nullable: true, select: false })
+  mfaLastUsedAt: Date | null
+
+  /** SHA-256 of the newest unexpired verify link; older links stop working. */
+  @Column({ name: 'verify_token_fingerprint', type: 'varchar', length: 64, nullable: true, select: false })
+  verifyTokenFingerprint: string | null
+
+  /** Same idea for reset links; the fingerprint clears once consumed. */
+  @Column({ name: 'reset_token_fingerprint', type: 'varchar', length: 64, nullable: true, select: false })
+  resetTokenFingerprint: string | null
+
   @CreateDateColumn({ name: 'created_at', type: Date })
   createdAt: Date
 

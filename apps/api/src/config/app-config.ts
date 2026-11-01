@@ -23,6 +23,12 @@ export interface AppConfig {
   sessionCookieSecure: boolean
   /** Implicit quote signals accepted per member per minute; 0 disables. */
   signalRateLimitPerMinute: number
+  /** Failed logins accepted per email+IP window before locking; 0 disables. */
+  loginRateLimitMax: number
+  /** Window length in minutes for the login failure counter. */
+  loginRateLimitWindowMinutes: number
+  /** Delivery for verification and reset links. Only console exists today. */
+  mailDriver: 'console'
   google?: OAuthClientConfig
   github?: OAuthClientConfig
 }
@@ -117,6 +123,32 @@ function parseOAuthPair(
   return { clientId: id, clientSecret: secret }
 }
 
+function parseLoginRateLimitMax(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return 5
+  const limit = Number(value.trim())
+  if (!Number.isInteger(limit) || limit < 0 || limit > 100) {
+    throw new Error('LOGIN_RATE_LIMIT_MAX must be an integer between 0 and 100.')
+  }
+  return limit
+}
+
+function parseLoginRateLimitWindow(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return 15
+  const minutes = Number(value.trim())
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+    throw new Error('LOGIN_RATE_LIMIT_WINDOW_MINUTES must be an integer between 1 and 1440.')
+  }
+  return minutes
+}
+
+function parseMailDriver(value: string | undefined): 'console' {
+  const driver = value?.trim() || 'console'
+  if (driver !== 'console') {
+    throw new Error(`MAIL_DRIVER "${driver}" is not supported; only "console" exists today.`)
+  }
+  return 'console'
+}
+
 /**
  * Reads and validates process environment configuration. Throwing here keeps
  * the process from serving traffic with a half-configured database, CORS,
@@ -155,6 +187,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     publicWebUrl: parsePublicWebUrl(env.PUBLIC_WEB_URL),
     sessionCookieSecure: parseBoolean(env.SESSION_COOKIE_SECURE, isProduction),
     signalRateLimitPerMinute: parseSignalRateLimit(env.SIGNAL_RATE_LIMIT_PER_MINUTE),
+    loginRateLimitMax: parseLoginRateLimitMax(env.LOGIN_RATE_LIMIT_MAX),
+    loginRateLimitWindowMinutes: parseLoginRateLimitWindow(env.LOGIN_RATE_LIMIT_WINDOW_MINUTES),
+    mailDriver: parseMailDriver(env.MAIL_DRIVER),
     google: parseOAuthPair(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, 'GOOGLE'),
     github: parseOAuthPair(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET, 'GITHUB'),
   }
