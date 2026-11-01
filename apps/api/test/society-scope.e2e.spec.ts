@@ -26,7 +26,7 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test'
     process.env.AUTH_SECRET = 'test-only-session-secret-at-least-32-characters'
-    process.env.PUBLIC_WEB_URL = 'http://localhost:3000'
+    process.env.PUBLIC_WEB_URL = 'http://localhost:3001'
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -45,7 +45,7 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
     }).compile()
 
     app = moduleRef.createNestApplication()
-    configureApp(app, { corsOrigins: ['http://localhost:3000'] })
+    configureApp(app, { corsOrigins: ['http://localhost:3001'] })
     await app.init()
     dataSource = app.get(DataSource)
     await seedDatabase(dataSource)
