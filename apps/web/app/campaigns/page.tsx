@@ -10,7 +10,7 @@ import { formatClosingDate, formatDeliveryDate } from '@/lib/format'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Group buys',
+  title: 'ShareBasket',
   description: 'Sample community group-buying campaigns with transparent quantity tiers.',
 }
 

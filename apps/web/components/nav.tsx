@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react'
+import { Menu, Search, Settings, ShoppingBag, UserRound, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -204,6 +204,15 @@ export function Nav() {
                 <UserRound className="size-5" aria-hidden />
                 {user ? 'Your account' : 'Sign in'}
               </Link>
+              {user && (
+                <Link
+                  href="/settings"
+                  className="mt-2 flex h-12 items-center gap-3 rounded-control px-3 text-[15px] hover:bg-surface-2"
+                >
+                  <Settings className="size-5" aria-hidden />
+                  Settings
+                </Link>
+              )}
           </nav>
         </div>
       )}
