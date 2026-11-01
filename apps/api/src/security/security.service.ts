@@ -149,7 +149,11 @@ export class SecurityService {
     }
     this.limiter.fail(key, ip)
 
-    const user = await this.users.findOne({ where: { email: email.trim().toLowerCase() } })
+    const user = await this.users
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email: email.trim().toLowerCase() })
+      .getOne()
     if (!user || !user.passwordHash) return
 
     const token = await this.tokens.signResetToken(user.id, user.email)
@@ -292,7 +296,12 @@ export class SecurityService {
   private async userForToken(token: string, purpose: string): Promise<User | null> {
     const payload = await this.tokens.consume(token, purpose, null)
     if (!payload) return null
-    const user = await this.users.findOne({ where: { id: payload.sub } })
+    const user = await this.users
+      .createQueryBuilder('user')
+      .addSelect('user.verifyTokenFingerprint')
+      .addSelect('user.resetTokenFingerprint')
+      .where('user.id = :id', { id: payload.sub })
+      .getOne()
     if (!user) return null
 
     const fingerprint = tokenFingerprint(token)

@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express'
 
 import { CampaignClosedError, QuoteValidationError } from '../campaigns/campaign-pricing'
+import { TooManyAttemptsException } from '../security/security.service'
 
 interface ErrorBody {
   statusCode: number
@@ -48,6 +49,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
       body = { statusCode: 400, code: 'VALIDATION_ERROR', message: exception.message, requestId }
     } else if (exception instanceof CampaignClosedError) {
       body = { statusCode: 409, code: 'CAMPAIGN_CLOSED', message: exception.message, requestId }
+    } else if (exception instanceof TooManyAttemptsException) {
+      response.setHeader('retry-after', String(exception.retryAfterSeconds))
+      body = { statusCode: 429, code: 'RATE_LIMITED', message: exception.message, requestId }
     } else if (exception instanceof HttpException) {
       const status = exception.getStatus()
       const payload = exception.getResponse()

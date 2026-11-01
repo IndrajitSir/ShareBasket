@@ -8,6 +8,7 @@ import { configureApp } from '../src/app.setup'
 import { entities, migrations } from '../src/database/database-options'
 import { SecurityModule } from '../src/security/security.module'
 import { AuthModule } from '../src/auth/auth.module'
+import { ConsoleMailer, type MailMessage } from '../src/security/console-mailer'
 
 const TEST_ENV_KEYS = [
   'NODE_ENV',
@@ -60,29 +61,26 @@ describe('Security flows (SQLite, migrated schema)', () => {
     }
   })
 
-  /** The console mailer logs through the Nest Logger, which uses console.log. */
-  const mailLog: { email?: string; link?: string }[] = []
-  let logCapture: jest.SpyInstance | null = null
+  /** Mock mailer captures sent messages directly. */
+  const mailLog: MailMessage[] = []
 
   beforeEach(() => {
     mailLog.length = 0
-    logCapture = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      const line = String(chunk)
-      const email = /to=(\S+)/.exec(line)?.[1]
-      const link = /((?:verify-email|reset-password)\?token=[A-Za-z0-9._-]+)/.exec(line)?.[1]
-      if (link) mailLog.push({ email, link })
-      return true
+    const mailer = app.get(ConsoleMailer)
+    jest.spyOn(mailer, 'send').mockImplementation((message: MailMessage) => {
+      mailLog.push(message)
     })
   })
 
   afterEach(() => {
-    logCapture?.mockRestore()
+    const mailer = app.get(ConsoleMailer)
+    jest.spyOn(mailer, 'send').mockRestore()
   })
 
   function lastLink(email: string, kind: 'verify-email' | 'reset-password'): string {
-    const found = mailLog.filter((entry) => entry.link?.includes(kind) && (!email || entry.email === email))
+    const found = mailLog.filter((entry) => entry.actionUrl.includes(kind) && (!email || entry.to === email))
     expect(found.length).toBeGreaterThan(0)
-    return found[found.length - 1].link!
+    return found[found.length - 1].actionUrl
   }
 
   it('registers locally as unverified and emails a verify link', async () => {
@@ -217,10 +215,24 @@ describe('Security flows (SQLite, migrated schema)', () => {
     const secret: string = start.body.secret
     expect(start.body.otpauthUri).toContain('otpauth://totp/')
 
+    // Use a fixed time so TOTP codes are deterministic across test steps.
+    const baseTime = new Date('2026-06-01T12:00:00.000Z').getTime()
+    let simulatedTime = baseTime
+
+    const realNow = Date.now
+    function totpCodeAt(time: number): string {
+      const step = Math.floor(time / 1000 / 30)
+      return hotpForTest(secret, step)
+    }
+
+    // --- Confirm MFA enrollment (step 0) ---
+    // Keep Date.now mocked during the HTTP call so the server sees the same time.
+    Date.now = () => simulatedTime
+    const confirmCode = totpCodeAt(simulatedTime)
     await request(app.getHttpServer())
       .post('/api/v1/auth/mfa/confirm')
       .set('Cookie', sessionCookie)
-      .send({ code: totpNow(secret) })
+      .send({ code: confirmCode })
       .expect(204)
 
     const status = await request(app.getHttpServer())
@@ -229,7 +241,7 @@ describe('Security flows (SQLite, migrated schema)', () => {
       .expect(200)
     expect(status.body.enabled).toBe(true)
 
-    // Password step now returns a challenge, not a session cookie.
+    // --- Login: password step returns a challenge ---
     const first = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email, password })
@@ -238,40 +250,49 @@ describe('Security flows (SQLite, migrated schema)', () => {
     expect(first.body.challenge).toBeDefined()
     expect(first.headers['set-cookie']).toBeUndefined()
 
-    // A bad code does not produce a session.
+    // --- Bad code rejected ---
     await request(app.getHttpServer())
       .post('/api/v1/auth/login/mfa')
       .send({ challenge: first.body.challenge, code: '000000' })
       .expect(401)
 
-    // The right code does.
+    // --- Correct TOTP code completes login (step 1, 30s later) ---
+    simulatedTime += 30_000
+    const loginCode = totpCodeAt(simulatedTime)
     const second = await request(app.getHttpServer())
       .post('/api/v1/auth/login/mfa')
-      .send({ challenge: first.body.challenge, code: totpNow(secret, 1) })
+      .send({ challenge: first.body.challenge, code: loginCode })
       .expect(200)
     expect(second.body.user.email).toBe(email)
 
-    // A fresh challenge cannot reuse the same 30-second step.
+    // --- Reusing the same step is rejected (fresh challenge, same code) ---
     const third = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email, password })
       .expect(200)
     await request(app.getHttpServer())
       .post('/api/v1/auth/login/mfa')
-      .send({ challenge: third.body.challenge, code: totpNow(secret, 2) })
+      .send({ challenge: third.body.challenge, code: loginCode })
       .expect(401)
 
-    // Disable with a current code, then plain login works again.
+    // --- Disable MFA with a fresh code (step 2, another 30s) ---
+    simulatedTime += 30_000
+    const disableCode = totpCodeAt(simulatedTime)
     await request(app.getHttpServer())
       .post('/api/v1/auth/mfa/disable')
       .set('Cookie', sessionCookie)
-      .send({ code: totpNow(secret, 3) })
+      .send({ code: disableCode })
       .expect(204)
+
+    Date.now = realNow
+
     const after = await request(app.getHttpServer())
       .get('/api/v1/auth/mfa/status')
       .set('Cookie', sessionCookie)
       .expect(200)
     expect(after.body.enabled).toBe(false)
+
+    // --- Plain login works after MFA disabled ---
     const plain = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email, password })
