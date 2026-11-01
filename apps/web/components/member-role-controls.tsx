@@ -31,6 +31,11 @@ export function MemberRoleControls({
         size="sm"
         variant="secondary"
         loading={pending}
+        aria-label={
+          nextRole === 'STEWARD'
+            ? `Make ${name} a steward of this group`
+            : `Change ${name} to a member of this group`
+        }
         onClick={() =>
           startTransition(async () => {
             setError(null)
@@ -39,7 +44,7 @@ export function MemberRoleControls({
           })
         }
       >
-        {nextRole === 'STEWARD' ? `Make ${name} a steward` : `Make ${name} a member`}
+        {nextRole === 'STEWARD' ? 'Make steward' : 'Make member'}
       </Button>
       {error && (
         <p role="alert" className="text-[12.5px] text-accent">

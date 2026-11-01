@@ -1,4 +1,4 @@
-import { ArrowRight, Info, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
+import { ArrowRight, Hourglass, Info, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -82,11 +82,24 @@ export default async function ForYouPage() {
               className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-bg px-3 py-1.5 text-fg transition-colors hover:border-fg"
             >
               {group.name}
-              <span className="text-muted">{group.memberCount}</span>
-              {group.role === 'STEWARD' && (
+              {group.status === 'PENDING' ? (
                 <span className="inline-flex items-center gap-1 text-[11.5px] text-accent">
-                  <ShieldCheck className="size-3" aria-hidden /> Steward
+                  <Hourglass className="size-3" aria-hidden /> Pending
                 </span>
+              ) : (
+                <>
+                  <span className="text-muted">{group.memberCount}</span>
+                  {group.role === 'STEWARD' && (
+                    <span className="inline-flex items-center gap-1 text-[11.5px] text-accent">
+                      <ShieldCheck className="size-3" aria-hidden /> Steward
+                      {group.pendingRequests > 0 && (
+                        <span className="rounded-full bg-accent-soft px-1.5 tabular-nums">
+                          {group.pendingRequests}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </>
               )}
             </Link>
           ))}
@@ -181,9 +194,10 @@ export default async function ForYouPage() {
             used in memory to sort groups by distance.
           </p>
           <p className="mt-1.5">
-            Membership here is a preview: joining is immediate, with no approval or address check and
-            no email addresses shown on a roster. The first member of a group becomes its steward; a
-            steward can hand that role to another member of the same group and nothing more.{' '}
+            Joining a group that already has members creates a request that a steward of that group
+            approves or declines; the first member of an empty group becomes its steward. Every
+            decision and role change is written to an append-only audit trail. There is still no
+            address or tenancy check, and no email addresses are shown on a roster.{' '}
             <Link href="/about" className="underline underline-offset-2 hover:text-fg">
               Project notes
             </Link>

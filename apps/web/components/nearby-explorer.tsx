@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { joinNearbyGroup, searchNearby } from '@/app/for-you/actions'
-import type { NearbyGroup, NearbyResult } from '@/lib/recommendation-types'
+import type { MembershipStatus, NearbyGroup, NearbyResult } from '@/lib/recommendation-types'
 import { Button } from './ui'
 
 type LocationState = 'idle' | 'locating' | 'denied' | 'unavailable' | 'ready'
@@ -26,7 +26,7 @@ function GroupRow({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [joined, setJoined] = useState(false)
+  const [outcome, setOutcome] = useState<MembershipStatus | null>(null)
 
   return (
     <li className="rounded-[18px] border border-line bg-bg p-4">
@@ -58,21 +58,24 @@ function GroupRow({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        {joined ? (
+        {outcome ? (
           <p role="status" className="text-[13px] text-[#3d5a41]">
-            You joined {group.name}. Refresh to see its group buys.
+            {outcome === 'PENDING'
+              ? `Request sent to ${group.name}. A steward will review it.`
+              : `You joined ${group.name} as its first steward.`}
           </p>
         ) : (
           <Button
             size="sm"
             variant="secondary"
             loading={pending}
+            aria-label={`Ask to join ${group.name}`}
             onClick={() =>
               startTransition(async () => {
                 setError(null)
                 const result = await joinNearbyGroup(group.id)
                 if (result.ok) {
-                  setJoined(true)
+                  setOutcome(result.group.status)
                   onJoined(group.name)
                 } else {
                   setError(result.message)
@@ -80,7 +83,7 @@ function GroupRow({
               })
             }
           >
-            Join {group.name}
+            Ask to join
           </Button>
         )}
         {error && (

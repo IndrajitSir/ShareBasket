@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 
-import type { NearbyResult } from '@/lib/recommendation-types'
+import type { GroupSummary, NearbyResult } from '@/lib/recommendation-types'
 import { joinGroup as joinGroupRequest, requestNearby } from '@/lib/recommendations'
 
 export type NearbyActionResult =
@@ -48,14 +48,15 @@ export async function searchNearby(input: {
 
 export async function joinNearbyGroup(
   societyId: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; group: GroupSummary } | { ok: false; message: string }> {
   if (!UUID.test(societyId)) return { ok: false, message: 'That group is not valid.' }
 
   try {
-    await joinGroupRequest(societyId)
+    const group = await joinGroupRequest(societyId)
     revalidatePath('/for-you')
     revalidatePath('/account')
-    return { ok: true }
+    revalidatePath(`/groups/${societyId}`)
+    return { ok: true, group }
   } catch (error) {
     return {
       ok: false,

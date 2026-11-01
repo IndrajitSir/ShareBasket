@@ -2,7 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 
-import { changeGroupMemberRole } from '@/lib/groups'
+import {
+  cancelGroupRequest,
+  changeGroupMemberRole,
+  decideGroupRequest,
+} from '@/lib/groups'
 import type { SocietyRole } from '@/lib/recommendation-types'
 
 /**
@@ -18,6 +22,34 @@ export async function setMemberRole(input: {
   const result = await changeGroupMemberRole(input.societyId, input.userId, input.role)
   if (result.ok) {
     revalidatePath(`/groups/${input.societyId}`)
+    revalidatePath('/for-you')
+    revalidatePath('/account')
+  }
+  return result
+}
+
+/** Steward decision on one pending request; the API enforces the same rule. */
+export async function decideJoinRequest(input: {
+  societyId: string
+  userId: string
+  decision: 'approve' | 'reject'
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const result = await decideGroupRequest(input.societyId, input.userId, input.decision)
+  if (result.ok) {
+    revalidatePath(`/groups/${input.societyId}`)
+    revalidatePath('/for-you')
+    revalidatePath('/account')
+  }
+  return result
+}
+
+/** Withdraws the signed-in account's own pending request. */
+export async function cancelJoinRequest(
+  societyId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const result = await cancelGroupRequest(societyId)
+  if (result.ok) {
+    revalidatePath(`/groups/${societyId}`)
     revalidatePath('/for-you')
     revalidatePath('/account')
   }

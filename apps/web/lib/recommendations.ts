@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
 import { serverApiBase } from './api'
-import type { NearbyResult, Recommendations } from './recommendation-types'
+import type { GroupSummary, NearbyResult, Recommendations } from './recommendation-types'
 
 /** The first-party session cookie is set by the auth proxy on this origin. */
 export async function sessionCookie(): Promise<string | undefined> {
@@ -51,12 +51,17 @@ export async function requestNearby(
   return readJson<NearbyResult>(response)
 }
 
-export async function joinGroup(societyId: string): Promise<void> {
+/**
+ * Join, or ask to join. The API decides which: a group with members records a
+ * PENDING request, an empty one bootstraps the caller as its steward.
+ */
+export async function joinGroup(societyId: string): Promise<GroupSummary> {
   const session = await sessionCookie()
   const response = await fetch(`${serverApiBase()}/me/groups/${encodeURIComponent(societyId)}`, {
     method: 'POST',
     headers: session ? { cookie: `sb_session=${session}` } : {},
     cache: 'no-store',
   })
-  await readJson(response)
+  const body = await readJson<{ group: GroupSummary }>(response)
+  return body.group
 }

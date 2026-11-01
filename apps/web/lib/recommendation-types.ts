@@ -25,6 +25,9 @@ export interface RecommendedCampaign {
 /** Scoped to one society; never a platform-wide role. */
 export type SocietyRole = 'MEMBER' | 'STEWARD'
 
+/** A request grants no access until a steward approves it. */
+export type MembershipStatus = 'PENDING' | 'ACTIVE'
+
 export interface GroupSummary {
   id: string
   name: string
@@ -32,6 +35,11 @@ export interface GroupSummary {
   memberCount: number
   activeCampaigns: number
   role: SocietyRole
+  status: MembershipStatus
+  /** Steward-only count of requests waiting for review. */
+  pendingRequests: number
+  /** When a pending request was made; null once active. */
+  requestedAt: string | null
 }
 
 export interface Recommendations {
