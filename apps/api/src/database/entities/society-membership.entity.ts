@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 
+import type { MembershipStatus } from '../../memberships/membership-status'
 import type { SocietyRole } from '../../memberships/society-role'
 import { Society } from './society.entity'
 import { User } from './user.entity'
@@ -33,9 +34,13 @@ export class SocietyMembership {
   @JoinColumn({ name: 'society_id' })
   society: Society
 
-  /** Preview memberships are immediately ACTIVE; approval is a later slice. */
-  @Column({ type: 'varchar', length: 16, default: 'ACTIVE' })
-  status: 'ACTIVE'
+  /**
+   * Joining a society with members creates a PENDING request that a steward
+   * must approve. Only ACTIVE rows grant access; the first member of an empty
+   * society is bootstrapped as an ACTIVE steward so a group can start.
+   */
+  @Column({ type: 'varchar', length: 16, default: 'PENDING' })
+  status: MembershipStatus
 
   /**
    * Scoped to this society only. The first member becomes STEWARD so a group

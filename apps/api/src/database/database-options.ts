@@ -10,6 +10,7 @@ import { CampaignSignal } from './entities/campaign-signal.entity'
 import { Category } from './entities/category.entity'
 import { Product } from './entities/product.entity'
 import { RecommendationSnapshotRow } from './entities/recommendation-snapshot.entity'
+import { SocietyAuditEvent } from './entities/society-audit-event.entity'
 import { SocietyMembership } from './entities/society-membership.entity'
 import { Society } from './entities/society.entity'
 import { User } from './entities/user.entity'
@@ -19,6 +20,7 @@ import { AddRecommendations1793000000002 } from './migrations/1793000000002-AddR
 import { DedupeQuoteSignals1793000000003 } from './migrations/1793000000003-DedupeQuoteSignals'
 import { AddRecommendationSnapshot1793000000004 } from './migrations/1793000000004-AddRecommendationSnapshot'
 import { AddMembershipRoles1793000000005 } from './migrations/1793000000005-AddMembershipRoles'
+import { AddMembershipApproval1793000000006 } from './migrations/1793000000006-AddMembershipApproval'
 
 export const entities = [
   Category,
@@ -29,6 +31,7 @@ export const entities = [
   CampaignPriceTier,
   User,
   SocietyMembership,
+  SocietyAuditEvent,
   CampaignSignal,
   RecommendationSnapshotRow,
 ]
@@ -39,6 +42,7 @@ export const migrations = [
   DedupeQuoteSignals1793000000003,
   AddRecommendationSnapshot1793000000004,
   AddMembershipRoles1793000000005,
+  AddMembershipApproval1793000000006,
 ]
 
 export function buildDataSourceOptions(config: AppConfig): DataSourceOptions {
