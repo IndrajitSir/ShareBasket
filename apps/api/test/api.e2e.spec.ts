@@ -35,7 +35,7 @@ describe('API (SQLite, migrated schema, seeded)', () => {
     }).compile()
 
     app = moduleRef.createNestApplication()
-    configureApp(app, { corsOrigins: ['http://localhost:3000'] })
+    configureApp(app, { corsOrigins: ['http://localhost:3001'] })
     await app.init()
     dataSource = app.get(DataSource)
     await seedDatabase(dataSource)
@@ -215,9 +215,9 @@ describe('API (SQLite, migrated schema, seeded)', () => {
 
     const cors = await request(app.getHttpServer())
       .get('/api/v1/campaigns')
-      .set('Origin', 'http://localhost:3000')
+      .set('Origin', 'http://localhost:3001')
       .expect(200)
-    expect(cors.headers['access-control-allow-origin']).toBe('http://localhost:3000')
+    expect(cors.headers['access-control-allow-origin']).toBe('http://localhost:3001')
 
     const blocked = await request(app.getHttpServer())
       .get('/api/v1/campaigns')

@@ -36,7 +36,7 @@ async function createApp(): Promise<INestApplication> {
   }).compile()
 
   const app = moduleRef.createNestApplication()
-  configureApp(app, { corsOrigins: ['http://localhost:3000'] })
+  configureApp(app, { corsOrigins: ['http://localhost:3001'] })
   await app.init()
   return app
 }
@@ -47,7 +47,7 @@ describe('Auth API (SQLite, migrated schema)', () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test'
     process.env.AUTH_SECRET = 'test-only-session-secret-at-least-32-characters'
-    process.env.PUBLIC_WEB_URL = 'http://localhost:3000'
+    process.env.PUBLIC_WEB_URL = 'http://localhost:3001'
     process.env.GOOGLE_CLIENT_ID = 'google-test-client'
     process.env.GOOGLE_CLIENT_SECRET = 'google-test-secret'
     process.env.GITHUB_CLIENT_ID = 'github-test-client'
@@ -172,13 +172,13 @@ describe('Auth API (SQLite, migrated schema)', () => {
     const agent = request.agent(app.getHttpServer())
     const start = await agent.get('/api/v1/auth/google').expect(302)
     expect(start.headers.location).toContain('https://accounts.google.com/o/oauth2/v2/auth')
-    expect(start.headers.location).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fbackend%2Fauth%2Fgoogle%2Fcallback')
+    expect(start.headers.location).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fapi%2Fbackend%2Fauth%2Fgoogle%2Fcallback')
     expect((start.headers['set-cookie'] as unknown as string[])[0]).toMatch(/sb_oauth_state=/)
 
     const mismatch = await agent
       .get('/api/v1/auth/google/callback?code=abc&state=wrong-state')
       .expect(302)
-    expect(mismatch.headers.location).toBe('http://localhost:3000/login?error=oauth_state')
+    expect(mismatch.headers.location).toBe('http://localhost:3001/login?error=oauth_state')
   })
 
   it('completes a Google OAuth callback and signs the user in', async () => {
@@ -214,7 +214,7 @@ describe('Auth API (SQLite, migrated schema)', () => {
       const callback = await agent
         .get(`/api/v1/auth/google/callback?code=provider-code&state=${state}`)
         .expect(302)
-      expect(callback.headers.location).toBe('http://localhost:3000/account?welcome=1')
+      expect(callback.headers.location).toBe('http://localhost:3001/account?welcome=1')
       const cookies = callback.headers['set-cookie'] as unknown as string[]
       expect(cookies.some((cookie) => cookie.startsWith('sb_session='))).toBe(true)
 
@@ -284,7 +284,7 @@ describe('Auth API without OAuth configuration', () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test'
     process.env.AUTH_SECRET = 'test-only-session-secret-at-least-32-characters'
-    process.env.PUBLIC_WEB_URL = 'http://localhost:3000'
+    process.env.PUBLIC_WEB_URL = 'http://localhost:3001'
     delete process.env.GOOGLE_CLIENT_ID
     delete process.env.GOOGLE_CLIENT_SECRET
     delete process.env.GITHUB_CLIENT_ID

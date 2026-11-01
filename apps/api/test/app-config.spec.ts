@@ -3,7 +3,7 @@ import { loadConfig } from '../src/config/app-config'
 const BASE = {
   NODE_ENV: 'test',
   AUTH_SECRET: 'test-only-session-secret-at-least-32-characters',
-  PUBLIC_WEB_URL: 'http://localhost:3000',
+  PUBLIC_WEB_URL: 'http://localhost:3001',
 }
 
 describe('loadConfig auth settings', () => {
