@@ -1,58 +1,33 @@
-# ShareBasket — community group buying
+ShareBasket
 
-A community bulk-buying marketplace for residential societies. Neighbours pool
-demand for everyday essentials, see every quantity price tier up front, and
-track progress toward each group minimum.
-
-The product specification lives in [`docs/`](docs/README.md); start with
-[`docs/PRODUCT.md`](docs/PRODUCT.md) and [`docs/TODO.md`](docs/TODO.md).
+Community bulk-buying marketplace.
 
 ## Repository layout
 
-```
-apps/web    Next.js 15 App Router storefront (TypeScript, Tailwind v4)
-apps/api    NestJS REST API at /api/v1 (TypeScript, TypeORM)
-infra       Dockerfiles, docker-compose.yml, deployment config
-docs        product, architecture, data, security and workflow docs
-```
+- `apps/api` — NestJS backend
+- `apps/web` — Next.js frontend
+- `infra` — Dockerfiles and Compose
+- `docs` — project documentation and decision records
 
-The two apps are independent npm workspaces. The web app never imports backend
-source; it talks to the API over JSON described in
-[`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md).
+Quick orientation:
+- install from the repository root with the project's package manager
+- verify with the commands in `docs/TESTING.md`
+- develop in small, independently tested units and commit each one
+- do not treat the project as deployment-ready until the relevant checks in
+  `docs/TODO.md` are completed and recorded
 
-## What works today
+Current state:
+- accounts, session auth, OAuth wiring, login/register/account pages and the
+  same-origin auth proxy are in place
+- society membership with scoped `MEMBER`/`STEWARD` roles, steward approval,
+  and an append-only audit trail is in place
+- residence verification (`P1-01f`) is in place as a per-society, member-declared,
+  steward-reviewed lifecycle
+- the explainability slice (`/for-you`, consented nearby groups) is in place
+- email notifications, invitations, stale-claim expiry, duplicate-claim disputes,
+  real OAuth consent smoke tests, CI, and a Vergel/Ren execution remain open
 
-- **Campaign discovery** at `/campaigns`: filter by community and category,
-  search campaigns, sort by closing date or progress, current tier price per
-  campaign.
-- **Campaign detail** at `/campaigns/[slug]`: all tiers, current tier, progress
-  against the group minimum, deadline, delivery date, and a quantity calculator
-  that asks the API to price the line server-side.
-- **Catalogue** at `/shop` and `/product/[slug]`, backed by the API, with a
-  search bar in the header and on listing pages.
-- **Accounts** at `/login`, `/register` and `/account`: email/password with
-  bcrypt, Google/GitHub OAuth when configured, and an HttpOnly JWT session kept
-  first-party through a same-origin proxy. Services are defined in
-  `apps/api/src/auth`.
-- **Recommendations** at `/for-you`: in-group picks, cross-group picks and a
-  trending cold start, each with a plain-language reason. Signed-in members can
-  join a preview society and, only after pressing **Use my location**, see open
-  groups sorted by rounded distance. Model and privacy details are in
-  [`docs/RECOMMENDATIONS.md`](docs/RECOMMENDATIONS.md).
-- **Persisted sample data**: categories, products, societies, campaigns, price
-  tiers, accounts, preview memberships and quote signals are stored with TypeORM
-  and served by NestJS.
-- **Health check** at `/api/v1/health` reporting database connectivity.
-
-## What is deliberately not live
-
-Society membership is a preview: joining is immediate with no approval, role or
-address verification. There are no commitments, orders, stock reservations,
-payments or verified suppliers. Accounts exist, but email verification, password
-reset, MFA and login rate limiting do not. The bag and checkout are a preview:
-checkout explains that ordering is not enabled and creates no order. Nothing here
-should be presented as a real offer, real saving, or real order.
-
+Do not self-declare production readiness. Human acceptance is required.
 ## Run it locally
 
 Requires Node.js 20+.
@@ -68,7 +43,7 @@ npm run dev -w apps/api          # http://localhost:4000/api/v1
 
 # Web (separate terminal)
 cp apps/web/.env.example apps/web/.env.local
-npm run dev -w apps/web          # http://localhost:3000
+npm run dev -w apps/web          # http://localhost:3001
 ```
 
 Root helpers: `npm run typecheck`, `npm run test`, `npm run build`, and
@@ -80,8 +55,8 @@ To exercise the PostgreSQL target locally, use
 
 OAuth is optional. Set `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and/or
 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` in `apps/api/.env`, with
-`PUBLIC_WEB_URL=http://localhost:3000`. The callback URLs are
-`http://localhost:3000/api/backend/auth/google/callback` and
+`PUBLIC_WEB_URL=http://localhost:3001`. The callback URLs are
+`http://localhost:3001/api/backend/auth/google/callback` and
 `.../github/callback`. Without keys, only email/password sign-in is shown.
 Production requires a 32+ character `AUTH_SECRET`.
 

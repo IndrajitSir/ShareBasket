@@ -1,113 +1,132 @@
-# Deployment and Operations
-Maintain local, CI/test, staging and production environments. Do not copy production data into dev without approved anonymisation.
+# Deployment Operations Guide
 
-## Deployable topology
-Two independent images are built from `infra/` and published separately:
+This document explains how the project ships and where each piece runs. It is
+a human-readable companion to the code; it does not authorize any production
+change and never contains live credentials.
 
-| Component | Local | Free cloud target | Build context |
-| --- | --- | --- | --- |
-| `apps/web` (Next.js) | `npm run dev -w apps/web` on port 3000 | Vercel, project root directory `apps/web` | `infra/web.Dockerfile` |
-| `apps/api` (NestJS) | `npm run dev -w apps/api` on port 4000 | Render Web Service (Docker) | `infra/api.Dockerfile` |
-| PostgreSQL | `infra/docker-compose.yml` service `db` | Render PostgreSQL or Neon free tier | image `postgres:16-alpine` |
+## Repositories and build targets
 
-Neither image depends on the other at build time; they only share the environment contract below. Build images from the repository root so the npm workspace files are in scope:
+- **Frontend:** `apps/web` — Next.js App Router application.
+- **Backend:** `apps/api` — NestJS REST API.
+- **Infra:** `infra/` — Dockerfiles and Compose for local parity with the
+  deployed shapes.
 
-```bash
-docker build -f infra/api.Dockerfile -t sharebasket-api .
-docker build -f infra/web.Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.example.com/api/v1 -t sharebasket-web .
-docker compose -f infra/docker-compose.yml up --build
-```
+Monorepo root is the repository root; workspaces are in `apps/` and shared
+config lives alongside them. There is no separate `src/` prototype tree in the
+current shipping layout.
 
-## Verification status
-`docker compose -f infra/docker-compose.yml config` was run and exited 0, so the topology parses. The images were **not built** and the stack was **not started** in the development environment used for this change: the Docker daemon socket returned permission denied. PostgreSQL migrations/seeds were exercised only on SQLite. Render and Vercel were not deployed. Treat the Dockerfiles and blueprints as reviewed but unproven until the build, PostgreSQL and cloud smoke checks in `TODO.md` (P0-16, P0-18) pass.
+The same images are intended to run in three deployment shapes:
 
-## Free-tier caveats
-- Render free web services sleep after inactivity, so the first request after idle is slow; health checks may wake the service.
-- Render's free PostgreSQL offer and retention windows change; confirm the current plan limits before relying on it. A free database may expire and lose data.
-- Vercel preview deployments use unique hostnames. Browser requests from each preview origin must be added to `CORS_ORIGINS`, or routed through a same-origin proxy, before browser-side quote calls work.
-- `NEXT_PUBLIC_API_URL` is baked into the browser bundle at build time; changing the API origin requires a rebuild/redeploy of the web app.
+1. **Vercel + Render** — free-tier defaults.
+2. **AWS** — container/EC2 or ECS-style deploy.
+3. **Virtual machine** — manual deploy of the same artifacts.
 
-## Deployment options
-All three targets run the **same two images** and the same NestJS recommendation code; there is no model server to provision.
+No deployment is assumed complete until it is smoke-tested against the real
+environment and the results are recorded in `TODO.md`.
 
-| Target | Web | API | Database | Notes |
-| --- | --- | --- | --- | --- |
-| Vercel + Render | Vercel (`apps/web`) | Render Docker (`infra/api.Dockerfile`) | Render PostgreSQL or Neon | Free-tier path; current blueprint. |
-| AWS | Vercel/Amplify, or the web image on ECS/App Runner | ECS Fargate or App Runner from `infra/api.Dockerfile` | RDS PostgreSQL | Migrations as a one-off ECS task/App Runner job; set secrets via Secrets Manager. |
-| Virtual machine | `web` compose service behind Nginx/Caddy TLS | `api` compose service | `db` compose service with a named volume | Simplest single-host path; back up the volume and restrict the database port. |
+## Shared development loop
 
-For AWS and a VM, set the same environment contract below plus `PUBLIC_WEB_URL` to the public HTTPS web origin and `CORS_ORIGINS` to the same origin. Run `npm run migration:run -w apps/api` once per release before starting new API tasks. Both images are stateless except for the database, so horizontal API replicas are safe.
+For each meaningful change, follow the incremental workflow in
+`AGENT_RULES.md` and the verification commands in `TESTING.md`. Do not merge a
+feature into the project until its own unit tests and the relevant type/lint
+checks pass, the diff has been reviewed, and the change is committed.
 
-Browser geolocation only works on `https://` origins or `localhost`. A plain-HTTP VM deployment must terminate TLS (Caddy/Nginx/ALB) or the nearby-groups button will be blocked by the browser.
+## Local development
 
-For a VM:
+- Install from the repository root with the project's package manager.
+- Start the backend and frontend as separate processes during development.
+- Keep the backend behind the same-origin proxy when the frontend is the entry
+  point, so sessions stay first-party.
+- Do not commit real secrets; use placeholders in `.env.example` files.
 
-```bash
-# .env values are read by compose; set AUTH_SECRET, PUBLIC_WEB_URL and CORS_ORIGINS first.
-docker compose -f infra/docker-compose.yml up --build -d
-# One-off schema + sample data (demo); production should run migrations only.
-docker compose -f infra/docker-compose.yml exec api npm run migration:run
-```
+## Docker and Compose
 
-The recommendation engine needs no extra dependency beyond PostgreSQL; society coordinates live in `society_master`. If recommendation load grows, add a scheduled precompute job rather than a separate ML cluster.
+`infra/docker-compose.yml` describes the intended local topology, including the
+database and services the app expects. Validate the Compose file with
+`docker compose -f infra/docker-compose.yml config` before relying on the
+layout; building and starting the stack requires the Docker socket, which may be
+unavailable in this environment.
 
-## Environment contract
-API (`apps/api/.env.example`):
-- `PORT` (default 4000), `NODE_ENV`.
-- `DB_DRIVER` = `postgres` for deployment; `sqlite` for local development/tests.
-- `DATABASE_URL` = `postgres://user:password@host:5432/database` (required when `DB_DRIVER=postgres`; `DATABASE_SSL=true` for most managed providers).
-- `SQLITE_PATH` (default `./data/sharebasket.sqlite`) when `DB_DRIVER=sqlite`.
-- `CORS_ORIGINS` = comma-separated browser origins, e.g. `http://localhost:3000,https://your-app.vercel.app`. Wildcards are not supported and must not be combined with credentials.
-- `SEED_ON_BOOT=true` for a demo environment only; production data must be seeded intentionally with `npm run seed -w apps/api`.
-- `AUTH_SECRET` — at least 32 random characters used to sign session JWTs. **Required in production**; the API refuses to start without it. Generate with `openssl rand -base64 48` and store it only in the hosting dashboard.
-- `SIGNAL_RATE_LIMIT_PER_MINUTE` — implicit quote signals accepted per member per minute (default 30, integer 0–10000; `0` disables). Counters are per API instance, so set it deliberately when scaling replicas.
-- `PUBLIC_WEB_URL` — the browser origin of the web app, e.g. `http://localhost:3000` or `https://your-app.vercel.app`. Used for OAuth redirect URIs and post-login redirects. No trailing path.
-- `SESSION_COOKIE_SECURE` — defaults to `true` when `NODE_ENV=production`. Set `false` only for a plain-HTTP local compose demo; HTTPS deployments must leave it secure.
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — optional pair; both must be set or both omitted.
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — optional pair; both must be set or both omitted.
+The Dockerfiles are kept minimal and deterministic:
+- `infra/api.Dockerfile` — the NestJS API.
+- `infra/web.Dockerfile` — the Next.js frontend.
 
-Web (`apps/web/.env.example`):
-- `API_URL` = server-side base URL of the API, e.g. `http://api:4000/api/v1` in compose or `https://your-api.onrender.com/api/v1`.
-- `NEXT_PUBLIC_API_URL` = browser-visible API base URL with the same value in cloud deployments. Only non-secret values belong in `NEXT_PUBLIC_*`.
+Both should produce artifacts that can run outside Docker, so the same code can
+be deployed to Render, AWS or a VM without a different branch or a different
+build pipeline.
 
-Secrets are set in the hosting dashboards (Vercel env vars, Render env vars). Never commit `.env`, `.env.local`, or real credentials.
+## Deployment shapes
 
-## OAuth application setup
-Create the apps only after the deployed web URL is known, because the redirect URI must match exactly:
+### Vercel + Render
 
-- Google (Google Cloud Console → APIs & Services → Credentials → OAuth client ID → Web application): authorised redirect URI `https://<web-origin>/api/backend/auth/google/callback` (locally `http://localhost:3000/api/backend/auth/google/callback`).
-- GitHub (Settings → Developer settings → OAuth Apps): authorization callback URL `https://<web-origin>/api/backend/auth/github/callback`.
+- The frontend is deployed to Vercel from `apps/web`.
+- The backend is deployed to Render from `apps/api`.
+- Keep environment names, CORS origins and session cookie settings consistent
+  across environments.
+- Free deployments are fine for previews and internal pilots; do not treat them
+  as production-ready until the relevant security, observability and backup
+  checks exist.
 
-Put the client ID/secret pairs in the **API** service environment, set `PUBLIC_WEB_URL` to the web origin, and redeploy the API. The login page hides a provider when its pair is absent; credentials login works without OAuth. Vercel previews have unique hostnames and therefore need their own OAuth apps/callbacks or a fixed preview domain before OAuth can be tested there.
+### AWS
 
-## Local setup
-1. `npm install` at the repository root.
-2. Copy `apps/api/.env.example` to `apps/api/.env` (SQLite default) and `apps/web/.env.example` to `apps/web/.env.local`.
-3. `npm run migration:run -w apps/api`, then `npm run seed -w apps/api`.
-4. `npm run dev -w apps/api` and `npm run dev -w apps/web` in separate terminals.
+- Package the same backend and frontend artifacts.
+- Provide managed PostgreSQL or an equivalent reachable database for the API.
+- Keep TLS termination consistent with the session cookie settings the API
+  expects.
 
-For the PostgreSQL path use `docker compose -f infra/docker-compose.yml up db` then run the same migration/seed commands with `DB_DRIVER=postgres` and a local `DATABASE_URL`.
+### Virtual machine
 
-## Render backend
-1. Create a Render PostgreSQL instance and copy its internal connection string, or import the included `render.yaml` blueprint, which provisions the database and the Docker web service together.
-2. Create (or let the blueprint create) a Web Service from this repository with **Docker** runtime, Dockerfile path `infra/api.Dockerfile`, no build command, and health check path `/api/v1/health`.
-3. Set `DB_DRIVER=postgres`, `DATABASE_URL`, `DATABASE_SSL=true`, `CORS_ORIGINS` and (server-side only) any future provider keys. Keep secrets in the Render dashboard, never in `render.yaml`.
-4. For a demo, the blueprint sets `MIGRATE_ON_BOOT`, `SEED_ON_BOOT` and `SEED_ALLOW_PRODUCTION` so the schema and synthetic sample data exist immediately. For any environment holding real data, remove those flags and run `npm run migration:run -w apps/api` once as a Render job/shell before the first traffic; the server does not migrate by default.
+- Install the same runtime used in the Dockerfiles.
+- Run migrations and seed before serving traffic.
+- Manage TLS and process supervision externally; the app does not assume a
+  managed runtime.
 
-## Vercel frontend
-1. Import the repository as a Vercel project and set the root directory to `apps/web`; the Next.js preset detects the workspace build.
-2. Set `API_URL` and `NEXT_PUBLIC_API_URL` to the Render API URL including `/api/v1`.
-3. Add the Vercel production and preview domains to the API's `CORS_ORIGINS` before relying on browser-side requests.
-4. Preview deployments each get a unique hostname; either add the preview domain pattern explicitly or route browser requests through a same-origin proxy before launch.
+## Database
 
-## Configuration/local setup
-`.env.example` contains descriptions and fake placeholders only. Validate required env at startup. Separate sandbox/live provider credentials. Never commit `.env`, credentials, signing keys or private dumps. Provide Docker Compose for PostgreSQL/Redis if used, and document install/migrate/seed/run/test/reset commands. Seeds are synthetic; demo payment mode is clearly labelled. Destructive reset scripts must refuse non-local environments.
+The schema supports PostgreSQL for deployment and SQLite for local/test work.
+Before any migration is applied to production data:
+- Review the migration and rollback path.
+- Use a backup or a restore exercise where appropriate.
+- Do not apply destructive migrations without explicit human approval.
 
-## CI/CD
-Formatting/lint → typecheck → tests → build → dependency/secret scan → migration validation → staging deploy → smoke tests → production approval. Use rollback-capable deployment and backward-compatible schema migrations.
+## Configuration
 
-## Observability
-Structured logs with correlation IDs; metrics for latency/errors, DB pool, queue lag, campaign conversion, payment outcomes and delivery delays; tracing where feasible. Alert on 5xx, webhook failures, queue backlog, backup failures, order/stock mismatches and suspicious admin activity. Redact PII/secrets.
+- Shared behavior is read from the runtime environment at startup.
+- Required configuration is validated on start; the app should refuse to start
+  with missing critical settings where that is part of the contract.
+- Never print, log or commit real secret values.
 
-## Recovery/runbooks
-Encrypted backups and point-in-time recovery where available. Define RPO/RTO before launch and test restore regularly. Document payment-provider outage, database outage, queue backlog, compromised account, leaked secret, privacy request, supplier suspension, campaign cancellation and failed delivery.
+## Smoke checks
+
+Before declaring any environment healthy, confirm:
+- Health and database connectivity.
+- Auth/sign-in and session handling at the real origin.
+- At least one read endpoint returns expected shapes.
+- The frontend proxy, if used, forwards the session correctly.
+
+Record the environment, URL, checks performed and any remaining blockers in
+`TODO.md` when a deployment is smoke-tested.
+
+## Rollback and recovery
+
+- Keep deployable artifacts and migration history deployable in reverse order
+  where the framework supports it.
+- Have a restore exercise before relying on backups in production.
+- Prefer reversible changes for risky steps; do not edit production data in ways
+  that cannot be audited or rolled back without a human decision.
+
+## Documentation ownership
+
+- `ARCHITECTURE.md` — high-level topology and components.
+- `API_CONTRACTS.md` — implemented endpoint shapes and error contracts.
+- `DATA_MODEL.md` — current entities, fields and relationships.
+- `RBAC_PERMISSIONS.md` — implemented scope and role model, including what is
+  not yet in place.
+- `BUSINESS_RULES.md` — product rules and open decisions.
+- `RECOMMENDATIONS.md` — recommendation model and privacy choices.
+- `TODO.md` — current task and deployment verification status.
+- `AGENT_RULES.md` — the authoritative development and commit policy.
+- `TESTING.md` — minimum verification before committing.
+- `README.md` — quickstart orientation.
+- `KNOWLEDGEBASE.md` — decisions and rationale.
+- `DEPLOYMENT_OPERATIONS.md` — this file.

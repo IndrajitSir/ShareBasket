@@ -43,7 +43,9 @@ Recommendations are computed server-side from group demand, quote signals, item-
 - `POST /me/groups/:societyId` — **requires a session**. Creates a join request for a society that already has active members — `201 { group }` with `status: "PENDING"` — or bootstraps the first member of an empty society as an `ACTIVE` `STEWARD`. Re-asking is idempotent and never changes the stored status or role. `404 NOT_FOUND` for an unknown society.
 - `DELETE /me/groups/:societyId` — **requires a session**. Leaves an active group or cancels a pending request; `204`, or `404 NOT_FOUND` when there is no row. A leaving steward passes the role to the earliest remaining active member.
 
-Membership is approval-based: a pending request grants no roster, campaign or scope access, and only an active steward of that same society can approve or reject it. There is still no address verification, invite flow or platform-wide role. Never treat `societyId` as proof of residence.
+Residence verification is optional per society, separate from membership status, and independent of email/identity verification. `POST /societies/:societyId/verification` submits a block, unit and tenancy declaration and sets the membership to `PENDING`; only a different steward of the same society can call `verify` or `reject` on a target member, and self-review returns `409 CONFLICT`. Verified residents are the only members who may be promoted to steward. The roster exposes only a verification status badge; block, unit and tenancy are never shown for other members.
+
+Membership is approval-based: a pending request grants no roster, campaign or scope access, and only an active steward of that same society can approve or reject it. A society is never addressed from `societyId` alone as proof of residence.
 
 ## Society-scoped authorization (implemented)
 Roles are scoped to one society and re-derived from the membership row on every request; a role is never accepted from the client as authority. `docs/RBAC_PERMISSIONS.md` is authoritative for the model.
