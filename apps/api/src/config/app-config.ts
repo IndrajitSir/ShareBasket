@@ -53,7 +53,7 @@ function parseSignalRateLimit(value: string | undefined): number {
 }
 
 function parseOrigins(value: string | undefined): string[] {
-  const origins = (value ?? 'http://localhost:3000')
+  const origins = (value ?? 'http://localhost:3001')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)
@@ -90,7 +90,7 @@ function parseAuthSecret(value: string | undefined, isProduction: boolean): stri
 }
 
 function parsePublicWebUrl(value: string | undefined): string {
-  const raw = value?.trim() || 'http://localhost:3000'
+  const raw = value?.trim() || 'http://localhost:3001'
   let url: URL
   try {
     url = new URL(raw)

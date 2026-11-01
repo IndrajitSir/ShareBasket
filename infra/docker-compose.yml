@@ -34,10 +34,10 @@ services:
       DATABASE_URL: postgres://sharebasket:sharebasket@db:5432/sharebasket
       DATABASE_SSL: 'false'
       PORT: '4000'
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3001
       # Demo-only signing secret; replace before any real deployment.
       AUTH_SECRET: compose-only-session-secret-change-before-deploy
-      PUBLIC_WEB_URL: http://localhost:3000
+      PUBLIC_WEB_URL: http://localhost:3001
       # Compose serves plain HTTP locally; do not use this in a real deployment.
       SESSION_COOKIE_SECURE: 'false'
       SIGNAL_RATE_LIMIT_PER_MINUTE: '30'
@@ -63,7 +63,7 @@ services:
       API_URL: http://api:4000/api/v1
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
     ports:
-      - '3000:3000'
+      - '3001:3001'
     depends_on:
       - api
 
