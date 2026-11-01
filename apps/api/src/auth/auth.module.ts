@@ -7,11 +7,12 @@ import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { OAuthService } from './oauth.service'
 import { SessionAuthGuard } from './session-auth.guard'
+import { SecurityModule } from '../security/security.module'
 import { loadConfig } from '../config/app-config'
 import { User } from '../database/entities/user.entity'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), JwtModule.register({})],
+  imports: [TypeOrmModule.forFeature([User]), JwtModule.register({}), SecurityModule],
   controllers: [AuthController],
   providers: [
     AuthService,

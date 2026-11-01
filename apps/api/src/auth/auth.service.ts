@@ -125,6 +125,8 @@ export class AuthService {
       byEmail.oauthProvider = profile.provider
       byEmail.oauthSubject = profile.subject
       byEmail.avatarUrl = byEmail.avatarUrl ?? profile.avatarUrl
+      // A verified provider identity proves the address; mark it verified.
+      byEmail.emailVerifiedAt ||= new Date()
       try {
         await this.users.save(byEmail)
       } catch (error) {
@@ -143,6 +145,8 @@ export class AuthService {
       avatarUrl: profile.avatarUrl,
       oauthProvider: profile.provider,
       oauthSubject: profile.subject,
+      // Provider identities arrive pre-verified; no local verify email needed.
+      emailVerifiedAt: new Date(),
     })
 
     try {
