@@ -211,6 +211,16 @@ describe('Society scope authorization (SQLite, migrated schema)', () => {
   })
 
   it('promotes a member, who can then act as a steward in that society only', async () => {
+    // Group authority requires a confirmed residence, so the member is
+    // verified by the current steward before the promotion is allowed.
+    await plainMember
+      .post(`/api/v1/societies/${mapleId}/verification`)
+      .send({ block: 'B', unit: '1204', tenancy: 'TENANT', attested: true })
+      .expect(200)
+    await steward
+      .post(`/api/v1/societies/${mapleId}/verification/${memberId}/verify`)
+      .expect(200)
+
     const promoted = await steward
       .patch(`/api/v1/societies/${mapleId}/members/${memberId}`)
       .send({ role: 'STEWARD' })

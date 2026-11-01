@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,10 @@ import { SocietyMembership } from '../database/entities/society-membership.entit
 import { Society } from '../database/entities/society.entity'
 import { User } from '../database/entities/user.entity'
 import type { MembershipStatus } from './membership-status'
+import type {
+  MembershipVerificationStatus,
+  TenancyType,
+} from './membership-verification'
 import type { SocietyAuditAction } from './society-audit-action'
 import { ROLE_RANK, type SocietyRole } from './society-role'
 
@@ -28,12 +33,16 @@ export interface GroupSummary {
   pendingRequests: number
   /** When a PENDING request was made; null for active memberships. */
   requestedAt: string | null
+  /** Residence verification, independent of membership status. */
+  verificationStatus: MembershipVerificationStatus
 }
 
 export interface GroupMember {
   userId: string
   name: string
   role: SocietyRole
+  verified: boolean
+  verificationStatus: MembershipVerificationStatus
   joinedAt: string
 }
 
@@ -41,6 +50,26 @@ export interface GroupRequest {
   userId: string
   name: string
   requestedAt: string
+}
+
+/** The caller's own residence claim, including the unit they declared. */
+export interface ResidenceClaim {
+  status: MembershipVerificationStatus
+  block: string | null
+  unit: string | null
+  tenancy: TenancyType | null
+  submittedAt: string | null
+  decidedAt: string | null
+}
+
+/** A pending claim as a steward needs to review it. */
+export interface VerificationRequest {
+  userId: string
+  name: string
+  block: string | null
+  unit: string
+  tenancy: TenancyType
+  submittedAt: string
 }
 
 export interface AuditEntry {
@@ -287,6 +316,8 @@ export class MembershipsService {
         userId: row.userId,
         name: row.user.name,
         role: row.role,
+        verified: row.verificationStatus === 'VERIFIED',
+        verificationStatus: row.verificationStatus,
         joinedAt: new Date(row.joinedAt).toISOString(),
       }))
       .sort(
@@ -310,6 +341,164 @@ export class MembershipsService {
       name: row.user.name,
       requestedAt: new Date(row.joinedAt).toISOString(),
     }))
+  }
+
+  /** The caller's own residence claim, including its block, unit and tenancy. */
+  async residenceClaimFor(userId: string, societyId: string): Promise<ResidenceClaim> {
+    const row = await this.memberships.findOne({ where: { userId, societyId } })
+    if (!row) throw new NotFoundException('Membership not found.')
+    return this.toResidenceClaim(row)
+  }
+
+  /** Pending claims for a steward to review, oldest first. */
+  async listVerificationRequests(societyId: string): Promise<VerificationRequest[]> {
+    const rows = await this.memberships.find({
+      where: { societyId, status: 'ACTIVE', verificationStatus: 'PENDING' },
+      relations: { user: true },
+      order: { verificationSubmittedAt: 'ASC' },
+    })
+
+    return rows.flatMap((row) =>
+      row.residenceUnit && row.tenancyType
+        ? [
+            {
+              userId: row.userId,
+              name: row.user.name,
+              block: row.residenceBlock,
+              unit: row.residenceUnit,
+              tenancy: row.tenancyType,
+              submittedAt: new Date(
+                row.verificationSubmittedAt ?? row.joinedAt,
+              ).toISOString(),
+            },
+          ]
+        : [],
+    )
+  }
+
+  /**
+   * The member declares a block/unit and tenancy type. Only UNVERIFIED and
+   * REJECTED rows may claim or re-claim; a pending or already-verified claim is
+   * a conflict rather than a silent overwrite.
+   */
+  async submitResidenceClaim(
+    userId: string,
+    societyId: string,
+    input: { block?: string | null; unit: string; tenancy: TenancyType },
+  ): Promise<ResidenceClaim> {
+    const user = await this.users.findOne({ where: { id: userId } })
+    if (!user) throw new NotFoundException('Account not found.')
+
+    const unit = this.cleanLabel(input.unit)
+    if (!unit) throw new BadRequestException('A unit or house number is required.')
+    const block = this.cleanLabel(input.block)
+
+    return this.dataSource.transaction(async (manager) => {
+      const memberships = manager.getRepository(SocietyMembership)
+      const membership = await memberships.findOne({
+        where: { userId, societyId, status: 'ACTIVE' },
+      })
+      if (!membership) throw new NotFoundException('Active membership not found.')
+
+      if (membership.verificationStatus === 'VERIFIED') {
+        throw new ConflictException('Your residence is already verified.')
+      }
+      if (membership.verificationStatus === 'PENDING') {
+        throw new ConflictException('Your residence claim is already waiting for review.')
+      }
+
+      membership.verificationStatus = 'PENDING'
+      membership.residenceBlock = block
+      membership.residenceUnit = unit
+      membership.tenancyType = input.tenancy
+      membership.verificationSubmittedAt = new Date()
+      membership.verificationDecidedAt = null
+      await memberships.save(membership)
+
+      await this.record(manager, {
+        societyId,
+        action: 'RESIDENCE_CLAIMED',
+        actor: { id: user.id, name: user.name },
+        target: { id: user.id, name: user.name },
+        fromStatus: null,
+        toStatus: null,
+        fromRole: null,
+        toRole: null,
+      })
+
+      return this.toResidenceClaim(membership)
+    })
+  }
+
+  async verifyResidence(
+    actorId: string,
+    societyId: string,
+    targetUserId: string,
+  ): Promise<GroupMember> {
+    return this.decideResidence(actorId, societyId, targetUserId, 'VERIFIED')
+  }
+
+  async rejectResidence(
+    actorId: string,
+    societyId: string,
+    targetUserId: string,
+  ): Promise<GroupMember> {
+    return this.decideResidence(actorId, societyId, targetUserId, 'REJECTED')
+  }
+
+  /**
+   * A steward confirms or rejects a claim. Self-review is blocked: a steward
+   * cannot verify their own residence, exactly as they cannot change their own
+   * role. Another steward of the same society must make this decision.
+   */
+  private async decideResidence(
+    actorId: string,
+    societyId: string,
+    targetUserId: string,
+    decision: 'VERIFIED' | 'REJECTED',
+  ): Promise<GroupMember> {
+    if (actorId === targetUserId) {
+      throw new ConflictException('You cannot review your own residence claim.')
+    }
+
+    const actor = await this.users.findOne({ where: { id: actorId } })
+    if (!actor) throw new NotFoundException('Account not found.')
+
+    return this.dataSource.transaction(async (manager) => {
+      const memberships = manager.getRepository(SocietyMembership)
+      const target = await memberships.findOne({
+        where: { userId: targetUserId, societyId, status: 'ACTIVE' },
+        relations: { user: true },
+      })
+      if (!target) throw new NotFoundException('Member not found.')
+      if (target.verificationStatus !== 'PENDING') {
+        throw new ConflictException('That residence claim is not waiting for review.')
+      }
+
+      target.verificationStatus = decision
+      target.verificationDecidedAt = new Date()
+      await memberships.save(target)
+
+      await this.record(manager, {
+        societyId,
+        action: decision === 'VERIFIED' ? 'RESIDENCE_VERIFIED' : 'RESIDENCE_REJECTED',
+        actor: { id: actor.id, name: actor.name },
+        target: { id: target.userId, name: target.user.name },
+        fromStatus: null,
+        toStatus: null,
+        fromRole: null,
+        toRole: null,
+      })
+
+      return {
+        userId: target.userId,
+        name: target.user.name,
+        role: target.role,
+        verified: target.verificationStatus === 'VERIFIED',
+        verificationStatus: target.verificationStatus,
+        joinedAt: new Date(target.joinedAt).toISOString(),
+      }
+    })
   }
 
   /** Newest first, capped: stewards see the recent history, not an export. */
@@ -370,6 +559,8 @@ export class MembershipsService {
         userId: target.userId,
         name: target.user.name,
         role: target.role,
+        verified: target.verificationStatus === 'VERIFIED',
+        verificationStatus: target.verificationStatus,
         joinedAt: new Date(target.joinedAt).toISOString(),
       }
     })
@@ -436,6 +627,14 @@ export class MembershipsService {
       if (!target) throw new NotFoundException('Member not found.')
 
       if (target.role !== role) {
+        // Group authority should not be handed to someone whose residence has
+        // not been confirmed. The bootstrapped founder is the only steward who
+        // starts unverified, and another steward can verify them later.
+        if (role === 'STEWARD' && target.verificationStatus !== 'VERIFIED') {
+          throw new ConflictException(
+            'Verify this member’s residence before making them a steward.',
+          )
+        }
         if (target.role === 'STEWARD' && role === 'MEMBER') {
           const stewards = await memberships.countBy({ societyId, role: 'STEWARD', status: 'ACTIVE' })
           if (stewards <= 1) {
@@ -463,9 +662,33 @@ export class MembershipsService {
         userId: target.userId,
         name: target.user.name,
         role: target.role,
+        verified: target.verificationStatus === 'VERIFIED',
+        verificationStatus: target.verificationStatus,
         joinedAt: new Date(target.joinedAt).toISOString(),
       }
     })
+  }
+
+  private toResidenceClaim(membership: SocietyMembership): ResidenceClaim {
+    return {
+      status: membership.verificationStatus,
+      block: membership.residenceBlock,
+      unit: membership.residenceUnit,
+      tenancy: membership.tenancyType,
+      submittedAt: membership.verificationSubmittedAt
+        ? new Date(membership.verificationSubmittedAt).toISOString()
+        : null,
+      decidedAt: membership.verificationDecidedAt
+        ? new Date(membership.verificationDecidedAt).toISOString()
+        : null,
+    }
+  }
+
+  /** Collapses whitespace; returns null for an empty value. */
+  private cleanLabel(value: string | null | undefined): string | null {
+    if (!value) return null
+    const cleaned = value.trim().replace(/\s+/g, ' ')
+    return cleaned.length > 0 ? cleaned : null
   }
 
   /** Single insert path for the trail; there is no update or delete method. */
@@ -509,6 +732,7 @@ export class MembershipsService {
       pendingRequests,
       requestedAt:
         membership.status === 'PENDING' ? new Date(membership.joinedAt).toISOString() : null,
+      verificationStatus: membership.verificationStatus,
     }
   }
 
@@ -535,6 +759,7 @@ export class MembershipsService {
           : 0,
       requestedAt:
         membership.status === 'PENDING' ? new Date(membership.joinedAt).toISOString() : null,
+      verificationStatus: membership.verificationStatus,
     }
   }
 }

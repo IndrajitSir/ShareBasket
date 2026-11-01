@@ -11,6 +11,9 @@ export const SOCIETY_AUDIT_ACTIONS = [
   'ROLE_CHANGED',
   'STEWARD_BOOTSTRAPPED',
   'STEWARD_SUCCEEDED',
+  'RESIDENCE_CLAIMED',
+  'RESIDENCE_VERIFIED',
+  'RESIDENCE_REJECTED',
 ] as const
 
 export type SocietyAuditAction = (typeof SOCIETY_AUDIT_ACTIONS)[number]
