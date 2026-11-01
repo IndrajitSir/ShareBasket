@@ -55,6 +55,10 @@ export type MembershipResult =
   | { ok: true; group: GroupSummary }
   | { ok: false; status: number; message: string }
 
+export type GroupsResult =
+  | { ok: true; groups: GroupSummary[] }
+  | { ok: false; message: string }
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
@@ -65,6 +69,29 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
     // Non-JSON error body; keep the fallback.
   }
   return fallback
+}
+
+/** Every membership this account holds, including pending requests. */
+export async function fetchMyGroups(): Promise<GroupsResult> {
+  const session = await sessionCookie()
+  if (!session) return { ok: true, groups: [] }
+
+  let response: Response
+  try {
+    response = await fetch(`${serverApiBase()}/me/groups`, {
+      headers: { cookie: `sb_session=${session}` },
+      cache: 'no-store',
+    })
+  } catch {
+    return { ok: false, message: 'Your groups could not be loaded right now.' }
+  }
+
+  if (!response.ok) {
+    return { ok: false, message: await errorMessage(response, 'Your groups could not be loaded.') }
+  }
+
+  const body = (await response.json()) as { groups: GroupSummary[] }
+  return { ok: true, groups: body.groups }
 }
 
 /**

@@ -1,6 +1,5 @@
 'use client'
 
-import { AnimatePresence, motion } from 'motion/react'
 import { Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -36,6 +35,22 @@ export function Nav() {
   const [user, setUser] = useState<AuthUser | null>(null)
 
   useEffect(() => setOpen(false), [pathname])
+
+  // While the mobile panel is open, Escape closes it and the page behind it
+  // does not scroll. Focus stays in the panel until it is dismissed.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previous
+    }
+  }, [open])
 
   useEffect(() => {
     let cancelled = false
@@ -88,7 +103,14 @@ export function Nav() {
               )
             })}
           </nav>
-          <button type="button" aria-label="Open menu" onClick={() => setOpen(true)} className="grid size-10 place-items-center rounded-control lg:hidden">
+          <button
+            type="button"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            aria-controls="mobile-navigation"
+            onClick={() => setOpen((current) => !current)}
+            className="grid size-10 place-items-center rounded-control lg:hidden"
+          >
             <Menu className="size-5" />
           </button>
 
@@ -132,18 +154,23 @@ export function Nav() {
         </div>
       </header>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div className="fixed inset-0 z-50 bg-fg/30 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)}>
-            <motion.nav
-              aria-label="Mobile"
-              initial={{ x: -24, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -24, opacity: 0 }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-y-2 left-2 flex w-[300px] flex-col rounded-dialog bg-bg p-5 shadow-drawer"
-              onClick={(event) => event.stopPropagation()}
-            >
+      {/*
+        Rendered conditionally rather than through an exit animation: the panel
+        must disappear as soon as Escape or the backdrop is used, including for
+        assistive technology, not 300 ms later.
+      */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-fg/30 lg:hidden"
+          onClick={() => setOpen(false)}
+          role="presentation"
+        >
+          <nav
+            id="mobile-navigation"
+            aria-label="Mobile"
+            className="absolute inset-y-2 left-2 flex w-[300px] flex-col overflow-y-auto rounded-dialog bg-bg p-5 shadow-drawer"
+            onClick={(event) => event.stopPropagation()}
+          >
               <div className="flex items-center justify-between">
                 <Logo />
                 <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-10 place-items-center rounded-control hover:bg-surface-2">
@@ -177,10 +204,9 @@ export function Nav() {
                 <UserRound className="size-5" aria-hidden />
                 {user ? 'Your account' : 'Sign in'}
               </Link>
-            </motion.nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </nav>
+        </div>
+      )}
     </>
   )
 }

@@ -58,9 +58,7 @@ export default async function LoginPage({
           ))}
         </dl>
 
-        <p className="mt-8 max-w-md text-[12.5px] leading-relaxed text-faint">
-          Accounts do not yet include email verification, password reset or society membership. Do not reuse a
-          sensitive password on this preview.
+        <p className="mt-8 max-w-md text-[12.5px] leading-relaxed text-faint">          Accounts do not yet include email verification or password reset. Group membership is approval-based and scoped to one society, and no sensitive password should be reused on this preview.
         </p>
       </div>
 
