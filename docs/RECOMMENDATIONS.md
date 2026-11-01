@@ -19,13 +19,13 @@ There is no Python service, model server, GPU, vector database or external ML AP
 - `trending` — cold-start fallback for anonymous users or users without signals.
 - `nearbyGroups` — **not** included here. It requires browser permission and a separate request.
 
-Flags: `signedIn`, `needsGroup` (signed in with no memberships), `needsLocation` (those users should be offered the location prompt), `personalized`.
+Flags: `signedIn`, `needsGroup` (signed in with no **active** memberships — a pending request counts as no group), `needsLocation` (those users should be offered the location prompt), `personalized` (at least one active membership). The `groups` array still includes pending requests, each with `status: "PENDING"`, so the page can explain the wait; section rankings ignore them.
 
 ## Algorithm (model `hybrid-demand-cf`, version `1.0.0`)
 All scores are normalized to 0–1 and combined with fixed weights; the implementation is a pure function with unit tests.
 
 ```
-groups   = memberships of current user
+groups   = ACTIVE memberships of current user (pending requests do not count)
 peers    = users sharing any of those societies, excluding current user
 peerW[c] = sum of quote weights for campaign c by peers
 demand[c] = min(1, unitsCommitted / minimumUnits)
@@ -55,7 +55,7 @@ Cold start is deliberate: a signed-out visitor sees trending only; a signed-in m
 ## User interface (`/for-you`)
 The Next.js page renders three labelled sections: **What your neighbours are buying** (in-group), **What other groups are buying** (cross-group) and **Trending this week** (cold start). Every card states its reason, current unit price, progress and closing date, and links to the campaign. Signed-out visitors see trending plus a sign-in prompt rather than any personalized claim.
 
-A signed-in member with no group sees **Your group picks start with a group** and the nearby panel. The panel requests browser location only when **Use my location** is pressed; it handles permission denial, unavailable location and a 1–50 km radius, then lists groups with a rounded distance, member count, open campaign count and the busiest campaign. A member can join a nearby group in place, after which the page reloads with the personalized sections. Users can browse every group buy without ever sharing a location.
+A signed-in member with no active group sees **Your group picks start with a group** and the nearby panel. The panel requests browser location only when **Use my location** is pressed; it handles permission denial, unavailable location and a 1–50 km radius, then lists groups with a rounded distance, member count, open campaign count and the busiest campaign. **Ask to join** creates a request: a group that already has members stays pending until one of its stewards approves it, while an empty group bootstraps the first member as its steward. Pending requests appear on `/account` and at `/groups/[id]` with a cancel action, and grant no campaign access. Users can browse every group buy without ever sharing a location.
 
 ## Signal writes, deduplication and rate limiting
 A quote stores implicit interest only. One row exists per `(member, campaign)` in `user_campaign_signal_detail`, enforced by the unique index `uq_signal_user_campaign`; a repeated quote updates that row's bounded weight (1–20) instead of adding a second data point. Peer counts and weights therefore cannot be inflated by quoting the same campaign repeatedly. The migration that introduces the index also collapses any pre-existing duplicates, keeping the highest quoted quantity.
@@ -81,7 +81,7 @@ The payload is stored as one JSON row in `recommendation_snapshot` (scope `globa
 The cache is in-process with a database-backed copy, so replicas each hold their own memory copy but agree on the persisted payload; no Redis or worker process is required. Budgets are enforced by `apps/api/test/recommendation-latency.spec.ts`: a snapshot over 800 campaigns and 1,200 signals must build in under 1.5 s, ranking the full candidate set in under 750 ms, and a warm read must average under 5 ms with zero database queries.
 
 ## Membership semantics
-`GET /me/groups`, `POST /me/groups/:societyId` and `DELETE /me/groups/:societyId`. Joining is immediate and has no approval workflow, invite or address verification. Each membership carries a role scoped to that society (`MEMBER` or `STEWARD`); the first member becomes steward and a departing steward hands the role on. Group-scoped actions are authorized by `SocietyScopeGuard`, and `/groups/[id]` shows the roster to members and role controls to stewards. See `RBAC_PERMISSIONS.md`. Recommendations use society ids only — they never read or infer a role.
+`GET /me/groups`, `GET /me/groups/:societyId`, `POST /me/groups/:societyId` and `DELETE /me/groups/:societyId`. Joining creates a `PENDING` request that a steward of that society approves or declines; the first member of an empty group is bootstrapped as its steward. There is no invite or address verification yet. Each membership carries a role scoped to that society (`MEMBER` or `STEWARD`), approvals and role changes are written to an append-only audit trail, and a departing steward hands the role to the earliest active member. Group-scoped actions are authorized by `SocietyScopeGuard`, and `/groups/[id]` shows the roster to members, the review queue and history to stewards, and a waiting page to requesters. See `RBAC_PERMISSIONS.md`. Recommendations use active society ids only — a pending request is never personalisation and a role is never read or inferred.
 
 ## Scalability and deployment
 The MVP loads open campaigns, memberships and quote signals and scores them in memory. That is appropriate for a pilot with a handful of societies, and the snapshot cache now keeps co-occurrence and trending ordering off the request path. It does **not** yet bound the request-time signal load:
