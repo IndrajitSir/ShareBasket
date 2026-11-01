@@ -26,7 +26,6 @@ import {
 import { AuthService } from './auth.service'
 import type { ExternalProvider, PublicUser } from './auth.types'
 import { CurrentUser } from './current-user.decorator'
-import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 import { OAuthExchangeError, OAuthService } from './oauth.service'
 import { SessionAuthGuard } from './session-auth.guard'
@@ -34,11 +33,6 @@ import { SecurityService } from '../security/security.service'
 import type { AppConfig } from '../config/app-config'
 
 type OAuthRequest = Request & { cookies?: Record<string, string> }
-type ClientRequest = Request & { ip?: string; ips?: string[] }
-
-function clientIp(request: ClientRequest): string {
-  return request.ip || request.ips?.[0] || 'unknown'
-}
 
 @Controller('auth')
 export class AuthController {
@@ -60,26 +54,6 @@ export class AuthController {
     // service returns the public shape, so only the id is needed.
     await this.security.sendVerificationByUserId(session.user.id)
     return { user: session.user }
-  }
-
-  /**
-   * Rate limiting and the optional TOTP second factor live in
-   * SecurityService; a successful first factor without MFA issues the
-   * session here, a challenge response does not.
-   */
-  @Post('login')
-  @HttpCode(200)
-  async login(
-    @Body() dto: LoginDto,
-    @Req() request: ClientRequest,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const result = await this.security.login(dto, clientIp(request))
-    if (result.mfa) return { mfaRequired: true, challenge: result.mfa.challenge }
-    if (result.token) {
-      response.cookie(SESSION_COOKIE, result.token, sessionCookieOptions(this.config.sessionCookieSecure))
-    }
-    return { user: result.user }
   }
 
   @Post('logout')
