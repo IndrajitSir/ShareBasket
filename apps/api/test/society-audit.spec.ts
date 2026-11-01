@@ -54,12 +54,37 @@ describe('Society audit trail (SQLite, migrated schema)', () => {
     await dataSource.destroy()
   })
 
-  it('defaults a membership inserted without a status to PENDING', async () => {
+  it('defaults a membership to PENDING and unverified residence', async () => {
     const row = await dataSource.getRepository(SocietyMembership).save(
       dataSource.getRepository(SocietyMembership).create({ userId, societyId }),
     )
 
     expect(row.status).toBe('PENDING')
+    expect(row.verificationStatus).toBe('UNVERIFIED')
+    expect(row.residenceUnit).toBeNull()
+    expect(row.tenancyType).toBeNull()
+    expect(row.verificationSubmittedAt).toBeNull()
+    expect(row.verificationDecidedAt).toBeNull()
+  })
+
+  it('stores a residence claim and its decision timestamps', async () => {
+    const repository = dataSource.getRepository(SocietyMembership)
+    const row = await repository.findOneOrFail({ where: { userId, societyId } })
+    row.residenceBlock = 'B'
+    row.residenceUnit = '1204'
+    row.tenancyType = 'TENANT'
+    row.verificationStatus = 'PENDING'
+    row.verificationSubmittedAt = new Date()
+    await repository.save(row)
+
+    const stored = await repository.findOneOrFail({ where: { id: row.id } })
+    expect(stored).toMatchObject({
+      residenceBlock: 'B',
+      residenceUnit: '1204',
+      tenancyType: 'TENANT',
+      verificationStatus: 'PENDING',
+    })
+    expect(stored.verificationSubmittedAt).toBeInstanceOf(Date)
   })
 
   it('accepts new audit events and keeps their snapshotted names', async () => {

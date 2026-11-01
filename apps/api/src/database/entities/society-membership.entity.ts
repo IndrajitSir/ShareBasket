@@ -9,6 +9,10 @@ import {
 } from 'typeorm'
 
 import type { MembershipStatus } from '../../memberships/membership-status'
+import type {
+  MembershipVerificationStatus,
+  TenancyType,
+} from '../../memberships/membership-verification'
 import type { SocietyRole } from '../../memberships/society-role'
 import { Society } from './society.entity'
 import { User } from './user.entity'
@@ -48,6 +52,30 @@ export class SocietyMembership {
    */
   @Column({ type: 'varchar', length: 16, default: 'MEMBER' })
   role: SocietyRole
+
+  /**
+   * Residence verification, independent of approval: an active member can be
+   * unverified, and only a steward who is not the claimant can confirm a unit.
+   */
+  @Column({ name: 'verification_status', type: 'varchar', length: 16, default: 'UNVERIFIED' })
+  verificationStatus: MembershipVerificationStatus
+
+  /** Block/tower within the society. Optional because small societies have none. */
+  @Column({ name: 'residence_block', type: 'varchar', length: 40, nullable: true })
+  residenceBlock: string | null
+
+  /** Flat or house number, the only address detail stored. Never a street address. */
+  @Column({ name: 'residence_unit', type: 'varchar', length: 20, nullable: true })
+  residenceUnit: string | null
+
+  @Column({ name: 'tenancy_type', type: 'varchar', length: 16, nullable: true })
+  tenancyType: TenancyType | null
+
+  @Column({ name: 'verification_submitted_at', type: Date, nullable: true })
+  verificationSubmittedAt: Date | null
+
+  @Column({ name: 'verification_decided_at', type: Date, nullable: true })
+  verificationDecidedAt: Date | null
 
   @CreateDateColumn({ name: 'joined_at', type: Date })
   joinedAt: Date
